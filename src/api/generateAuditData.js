@@ -1,11 +1,9 @@
 /**
  * API клиент для генерации данных аудита
- * Отправляет POST запрос через CORS proxy
+ * PRODUCTION версия - работает с реальным backend
  */
 
-// ✅ Правильный формат для corsproxy.io
-const BACKEND_URL = 'http://109.172.37.52:8080';
-const API_BASE_URL = `https://corsproxy.io/?${encodeURIComponent(BACKEND_URL)}`;
+const API_BASE_URL = 'https://109.172.37.52:8080';
 const REQUEST_TIMEOUT = 120000; // 2 минуты
 
 // Маппинг городов на cityCode и cityId
@@ -72,19 +70,17 @@ export const generateAuditData = async (params) => {
     url5: competitors[3] || ''
   };
 
-  console.log('[generateAuditData] Отправляем запрос к backend (через CORS proxy):', {
-    backend: `${BACKEND_URL}/generate-url`,
+  console.log('[generateAuditData] 📤 Отправляем запрос к backend:', {
+    url: `${API_BASE_URL}/generate-url`,
+    payload,
     timeout: `${REQUEST_TIMEOUT / 1000}сек`
   });
 
   try {
     const startTime = Date.now();
     
-    // Полный URL к эндпоинту через CORS proxy
-    const fullUrl = `${API_BASE_URL}/generate-url`;
-    
     const response = await fetchWithTimeout(
-      fullUrl,
+      `${API_BASE_URL}/generate-url`,
       {
         method: 'POST',
         headers: {
@@ -101,11 +97,14 @@ export const generateAuditData = async (params) => {
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error(`[generateAuditData] ❌ Backend error: ${response.status}`);
+      console.error('[generateAuditData] Response:', errorText);
       throw new Error(`Backend error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
     console.log('[generateAuditData] ✅ Данные успешно получены');
+    console.log('[generateAuditData] Response:', data);
     return data;
   } catch (error) {
     console.error('[generateAuditData] ❌ Ошибка:', error.message);

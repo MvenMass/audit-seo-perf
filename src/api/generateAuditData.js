@@ -4,7 +4,8 @@
  */
 
 // ✅ HTTPS вместо HTTP для production
-const API_BASE_URL = 'http://109.172.37.52:8080';
+const CORS_PROXY = 'https://corsproxy.io/?';
+const API_BASE_URL = CORS_PROXY + encodeURIComponent(BACKEND_URL);
 const REQUEST_TIMEOUT = 120000; // 2 минуты (вместо 30 сек) - backend медленный!
 
 // Маппинг городов на cityCode и cityId

@@ -3,7 +3,7 @@
  * Отправляет POST запрос на backend: 109.172.37.52:8080/generate-url
  */
 
-const API_BASE_URL = 'http://109.172.37.52:8080';
+const API_BASE_URL = 'https://109.172.37.52:8080';
 const REQUEST_TIMEOUT = 30000; // 30 секунд
 
 // Маппинг городов на cityCode и cityId

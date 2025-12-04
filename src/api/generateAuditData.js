@@ -1,10 +1,11 @@
 /**
  * API клиент для генерации данных аудита
- * Отправляет POST запрос на backend: 109.172.37.52:8080/generate-url
+ * Отправляет POST запрос на backend
  */
 
+// ✅ HTTPS вместо HTTP для production
 const API_BASE_URL = 'https://109.172.37.52:8080';
-const REQUEST_TIMEOUT = 30000; // 30 секунд
+const REQUEST_TIMEOUT = 120000; // 2 минуты (вместо 30 сек) - backend медленный!
 
 // Маппинг городов на cityCode и cityId
 const cityMapping = {
@@ -70,7 +71,14 @@ export const generateAuditData = async (params) => {
     url5: competitors[3] || ''
   };
 
+  console.log('[generateAuditData] Отправляем запрос к backend (может быть медленным):', {
+    url: `${API_BASE_URL}/generate-url`,
+    timeout: `${REQUEST_TIMEOUT / 1000}сек`
+  });
+
   try {
+    const startTime = Date.now();
+    
     const response = await fetchWithTimeout(
       `${API_BASE_URL}/generate-url`,
       {
@@ -84,15 +92,19 @@ export const generateAuditData = async (params) => {
       REQUEST_TIMEOUT
     );
 
+    const elapsedTime = Math.round((Date.now() - startTime) / 1000);
+    console.log(`[generateAuditData] ✅ Ответ получен за ${elapsedTime}сек`);
+
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`Backend error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
+    console.log('[generateAuditData] ✅ Данные успешно получены');
     return data;
   } catch (error) {
-    console.error('Ошибка при запросе к backend:', error);
+    console.error('[generateAuditData] ❌ Ошибка:', error.message);
     throw error;
   }
 };

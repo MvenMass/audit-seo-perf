@@ -3,7 +3,7 @@
  * PRODUCTION версия - работает с реальным backend
  */
 
-const API_BASE_URL = 'https://109.172.37.52:8080';
+const API_BASE_URL = 'http://109.172.37.52:8080';
 const REQUEST_TIMEOUT = 120000; // 2 минуты
 
 // Маппинг городов на cityCode и cityId

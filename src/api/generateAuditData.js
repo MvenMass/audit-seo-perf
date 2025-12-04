@@ -1,12 +1,12 @@
 /**
  * API клиент для генерации данных аудита
- * Отправляет POST запрос на backend
+ * Отправляет POST запрос через CORS proxy
  */
 
-// ✅ HTTPS вместо HTTP для production
-const CORS_PROXY = 'https://corsproxy.io/?';
-const API_BASE_URL = CORS_PROXY + encodeURIComponent(BACKEND_URL);
-const REQUEST_TIMEOUT = 120000; // 2 минуты (вместо 30 сек) - backend медленный!
+// ✅ Правильный формат для corsproxy.io
+const BACKEND_URL = 'http://109.172.37.52:8080';
+const API_BASE_URL = `https://corsproxy.io/?${encodeURIComponent(BACKEND_URL)}`;
+const REQUEST_TIMEOUT = 120000; // 2 минуты
 
 // Маппинг городов на cityCode и cityId
 const cityMapping = {
@@ -72,16 +72,19 @@ export const generateAuditData = async (params) => {
     url5: competitors[3] || ''
   };
 
-  console.log('[generateAuditData] Отправляем запрос к backend (может быть медленным):', {
-    url: `${API_BASE_URL}/generate-url`,
+  console.log('[generateAuditData] Отправляем запрос к backend (через CORS proxy):', {
+    backend: `${BACKEND_URL}/generate-url`,
     timeout: `${REQUEST_TIMEOUT / 1000}сек`
   });
 
   try {
     const startTime = Date.now();
     
+    // Полный URL к эндпоинту через CORS proxy
+    const fullUrl = `${API_BASE_URL}/generate-url`;
+    
     const response = await fetchWithTimeout(
-      `${API_BASE_URL}/generate-url`,
+      fullUrl,
       {
         method: 'POST',
         headers: {

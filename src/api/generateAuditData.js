@@ -1,144 +1,100 @@
+/**
+ * API клиент для генерации данных аудита
+ * Отправляет POST запрос на backend: 109.172.37.52:8080/generate-url
+ */
 
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+const API_BASE_URL = 'http://109.172.37.52:8080';
+const REQUEST_TIMEOUT = 30000; // 30 секунд
 
-const BASE_CITIES = [
-  "Москва",
-  "Санкт-Петербург",
-  "Новосибирск",
-  "Екатеринбург",
-  "Казань",
-  "Нижний Новгород",
-  "Челябинск",
-  "Самара",
-  "Ростов-на-Дону",
-  "Уфа",
-  "Воронеж",
-  "Пермь",
-  "Красноярск",
-  "Волгоград",
-  "Саратов",
-  "Тюмень"
-];
-
-const UrlGenerator = () => {
-  const navigate = useNavigate();
-  const [city, setCity] = useState("");
-  const [site, setSite] = useState("");
-  const [competitors, setCompetitors] = useState(["", "", "", "", ""]);
-  const [loading, setLoading] = useState(false);
-
-  const handleCompetitorChange = (index, value) => {
-    const newCompetitors = [...competitors];
-    newCompetitors[index] = value;
-    setCompetitors(newCompetitors);
-  };
-
-  const handleGenerate = async () => {
-    if (!city.trim() || !site.trim()) {
-      alert("Пожалуйста, заполните поля 'Ваш город' и 'Ваш сайт'");
-      return;
-    }
-
-    const formData = {
-      city,
-      site,
-      competitors: competitors.filter(comp => comp.trim() !== "")
-    };
-
-    setLoading(true);
-
-    // ✅ В разработке (localhost) используем fallback JSON
-    // Когда деплоишь на production, можно вернуть backend
-    try {
-      // Имитируем задержку загрузки
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      navigate('/audit-results', { 
-        state: { 
-          formData
-          // auditData не передаем - будет использован fallback /auditData.json
-        } 
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleClear = () => {
-    setCity("");
-    setSite("");
-    setCompetitors(["", "", "", "", ""]);
-  };
-
-  return (
-    <div className="url-generator">
-      <div className="url-generator-header">
-        <span>Аудит сайта</span> от Seo Performance 
-      </div>
-
-      <div className="url-generator-block">
-        <label className="url-generator-label">Ваш город:</label>
-        <select
-          className="url-generator-input"
-          value={city}
-          onChange={e => setCity(e.target.value)}
-          disabled={loading}
-        >
-          <option value="">Выберите город</option>
-          {BASE_CITIES.map((c) => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </select>
-      </div>
-
-      <div className="url-generator-block">
-        <label className="url-generator-label">Ваш сайт:</label>
-        <input
-          type="text"
-          value={site}
-          onChange={(e) => setSite(e.target.value)}
-          placeholder="Введите сайт"
-          className="url-generator-input"
-          disabled={loading}
-        />
-      </div>
-
-      <div className="url-generator-block url-generator-block__container">
-        <label className="url-generator-label">Укажите сайты конкурентов:</label>
-        <div className="url-generator-block__conc">
-          {competitors.map((comp, index) => (
-            <input
-              key={index}
-              type="text"
-              value={comp}
-              onChange={(e) => handleCompetitorChange(index, e.target.value)}
-              placeholder={`Сайт конкурента ${index + 1}`}
-              className="url-generator-input url-generator-input-conc"
-              disabled={loading}
-            />
-          ))}
-        </div>
-      </div>
-
-      <div className="url-generator-buttons">
-        <button 
-          className="url-generator-generate" 
-          onClick={handleGenerate}
-          disabled={loading}
-        >
-          {loading ? '⏳ Анализирование...' : 'Начать анализ'}
-        </button>
-        <button 
-          className="url-generator-clear" 
-          onClick={handleClear}
-          disabled={loading}
-        >
-          Очистить данные
-        </button>
-      </div>
-    </div>
-  );
+// Маппинг городов на cityCode и cityId
+const cityMapping = {
+  'Москва': { cityCode: 'msk', cityId: 213 },
+  'Ростов-на-Дону': { cityCode: 'rnd', cityId: 39 },
+  'Екатеринбург': { cityCode: 'ekb', cityId: 54 },
+  'Уфа': { cityCode: 'ufa', cityId: 172 },
+  'Краснодар': { cityCode: 'krr', cityId: 35 },
+  'Пермь': { cityCode: 'prm', cityId: 50 },
+  'Самара': { cityCode: 'sam', cityId: 51 },
+  'Красноярск': { cityCode: 'kry', cityId: 62 },
+  'Омск': { cityCode: 'oms', cityId: 66 },
+  'Казань': { cityCode: 'kzn', cityId: 43 },
+  'Новосибирск': { cityCode: 'nsk', cityId: 65 },
+  'Н. Новгород': { cityCode: 'nnv', cityId: 47 },
+  'Нижний Новгород': { cityCode: 'nnv', cityId: 47 },
+  'Волгоград': { cityCode: 'vlg', cityId: 38 },
+  'Воронеж': { cityCode: 'vrn', cityId: 193 },
+  'Санкт-Петербург': { cityCode: 'spb', cityId: 2 },
+  'Томск': { cityCode: 'tom', cityId: 67 },
+  'Челябинск': { cityCode: 'chel', cityId: 56 },
+  'Саратов': { cityCode: 'sar', cityId: 64 },
+  'Тюмень': { cityCode: 'tum', cityId: 60 }
 };
 
-export default UrlGenerator;
+/**
+ * Утилита для fetch с таймаутом
+ */
+const fetchWithTimeout = (url, options = {}, timeout = REQUEST_TIMEOUT) => {
+  return Promise.race([
+    fetch(url, options),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`Запрос истёк (${timeout / 1000}сек)`)), timeout)
+    )
+  ]);
+};
+
+/**
+ * Генерирует данные аудита через backend
+ * @param {object} params - параметры запроса
+ * @param {string} params.city - название города
+ * @param {string} params.site - основной сайт
+ * @param {array} params.competitors - массив сайтов конкурентов
+ * @returns {object} - данные аудита или ошибка
+ */
+export const generateAuditData = async (params) => {
+  const { city, site, competitors } = params;
+
+  // Получаем cityCode и cityId
+  const cityInfo = cityMapping[city];
+  if (!cityInfo) {
+    throw new Error(`Город "${city}" не найден в справочнике`);
+  }
+
+  // Подготавливаем данные для отправки
+  const payload = {
+    cityCode: cityInfo.cityCode,
+    cityId: cityInfo.cityId,
+    url1: site,
+    url2: competitors[0] || '',
+    url3: competitors[1] || '',
+    url4: competitors[2] || '',
+    url5: competitors[3] || ''
+  };
+
+  try {
+    const response = await fetchWithTimeout(
+      `${API_BASE_URL}/generate-url`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      },
+      REQUEST_TIMEOUT
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Backend error: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Ошибка при запросе к backend:', error);
+    throw error;
+  }
+};
+
+export default generateAuditData;

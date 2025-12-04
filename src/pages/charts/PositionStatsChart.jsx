@@ -19,43 +19,20 @@ ChartJS.register(
   Legend
 );
 
-function PositionStatsChart() {
+function PositionStatsChart({ positionStats = {} }) {
   const [activeButton, setActiveButton] = useState('top1');
 
-  const chartDataSets = {
-    top1: {
-      labels: ['Домен 1', 'Домен 2', 'Домен 3', 'Домен 4', 'Домен 5'],
-      data: [600, 100, 700, 900, 550],
-      title: 'Запросы в ТОП 1'
-    },
-    top3: {
-      labels: ['Домен 1', 'Домен 2', 'Домен 3', 'Домен 4', 'Домен 5'],
-      data: [550, 120, 680, 850, 520],
-      title: 'Запросы в ТОП 3'
-    },
-    top5: {
-      labels: ['Домен 1', 'Домен 2', 'Домен 3', 'Домен 4', 'Домен 5'],
-      data: [620, 150, 720, 920, 580],
-      title: 'Запросы в ТОП 5'
-    },
-    percentage: {
-      labels: ['Домен 1', 'Домен 2', 'Домен 3', 'Домен 4', 'Домен 5'],
-      data: [35, 20, 42, 55, 40],
-      title: 'Процент в ТОП 5'
-    },
-    pages: {
-      labels: ['Домен 1', 'Домен 2', 'Домен 3', 'Домен 4', 'Домен 5'],
-      data: [250, 180, 300, 280, 220],
-      title: 'Страницы в индексе'
-    },
-    traffic: {
-      labels: ['Домен 1', 'Домен 2', 'Домен 3', 'Домен 4', 'Домен 5'],
-      data: [85, 45, 120, 110, 75],
-      title: 'Посещаемость в день'
-    }
-  };
+  // Fallback если нет данных
+  if (!positionStats || Object.keys(positionStats).length === 0) {
+    return <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>Нет данных о позициях</div>;
+  }
 
+  const chartDataSets = positionStats;
   const currentData = chartDataSets[activeButton];
+
+  if (!currentData) {
+    return <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>Нет данных</div>;
+  }
 
   const options = {
     responsive: true,

@@ -23,7 +23,6 @@ ChartJS.register(
   Filler
 );
 
-// Градиент с переменным alpha: от непрозрачного вверху к прозрачному внизу
 function createGradient(ctx, chartArea, colorStart, colorEnd) {
   const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
   gradient.addColorStop(0, colorStart);
@@ -31,75 +30,73 @@ function createGradient(ctx, chartArea, colorStart, colorEnd) {
   return gradient;
 }
 
-function SeasonalityChart() {
+function SeasonalityChart({ seasonalityData = {} }) {
   const chartRef = useRef();
 
-  const labels = [
-    '01.12', '01.13', '01.14', '01.15', '01.16', '01.17', '01.18',
-    '01.19', '01.20', '01.21', '01.22', '01.23', '01.24', '01.25',
-    '01.26', '01.27', '01.28', '01.29', '01.30', '01.31', '01.32'
-  ];
-  const commercialData = [
-    50000, 120000, 180000, 220000, 200000, 190000, 210000, 240000,
-    260000, 280000, 320000, 330000, 310000, 280000, 240000, 220000, 210000, 230000, 230000, 230000, 230000
-  ];
-  const nonCommercialData = [
-    30000, 80000, 130000, 160000, 140000, 120000, 160000, 180000,
-    200000, 230000, 250000, 280000, 240000, 200000, 170000, 150000, 130000, 120000, 120000, 120000, 120000
-  ];
+  // Fallback если нет данных
+  if (!seasonalityData || !seasonalityData.labels) {
+    return <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>Нет данных о сезонности</div>;
+  }
 
-const options = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      position: 'bottom',
-      labels: {
-        usePointStyle: true,
-        padding: 20,
-        font: {
-          size: 13
+  const labels = seasonalityData.labels || [];
+  const commercialData = seasonalityData.commercial || [];
+  const nonCommercialData = seasonalityData.nonCommercial || [];
+
+  if (labels.length === 0 || commercialData.length === 0) {
+    return <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>Нет данных</div>;
+  }
+
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          usePointStyle: true,
+          padding: 20,
+          font: {
+            size: 13
+          }
         }
-      }
-    }
-  },
-  scales: {
-    x: {
-      grid: {
-        display: true,
-        color: 'rgba(0, 0, 0, 0.05)'
-      },
-      ticks: {
-        maxRotation: 45,
-        minRotation: 45,
       }
     },
-    y: {
-      beginAtZero: true,
-      max: 400000,
-      grid: {
-        display: true,
-        color: 'rgba(0, 0, 0, 0.05)'
+    scales: {
+      x: {
+        grid: {
+          display: true,
+          color: 'rgba(0, 0, 0, 0.05)'
+        },
+        ticks: {
+          maxRotation: 45,
+          minRotation: 45
+        }
       },
-      ticks: {
-        stepSize: 50000,
-        callback: function(value) {
-          return value.toString(); // без пробелов
+      y: {
+        beginAtZero: true,
+        max: 400000,
+        grid: {
+          display: true,
+          color: 'rgba(0, 0, 0, 0.05)'
+        },
+        ticks: {
+          stepSize: 50000,
+          callback: function(value) {
+            return value.toString();
+          }
         }
       }
+    },
+    elements: {
+      line: {
+        tension: 0
+      }
     }
-  },
-  elements: {
-    line: {
-      tension: 0
-    }
-  }
-};
+  };
 
   const data = {
     labels,
     datasets: [
-      // Оранжевый сзади (nonCommercial ниже)
       {
         label: 'Сезонность некоммерческих запросов',
         data: nonCommercialData,
@@ -113,14 +110,13 @@ const options = {
           return gradient;
         },
         fill: true,
-        tension: 0, // Острые углы: прямые линии между точками
+        tension: 0,
         borderWidth: 2,
         pointRadius: 4,
         pointBackgroundColor: 'rgb(251, 146, 60)',
         pointBorderColor: '#fff',
         pointBorderWidth: 2
       },
-      // Фиолетовый спереди (коммерческий выше, перекрывает)
       {
         label: 'Сезонность коммерческих запросов',
         data: commercialData,
@@ -131,7 +127,7 @@ const options = {
           return createGradient(ctx, chartArea, 'rgba(139, 92, 246, 0.3)', 'rgba(255, 255, 255, 0.1)');
         },
         fill: true,
-        tension: 0, // Острые углы: прямые линии между точками
+        tension: 0,
         borderWidth: 2,
         pointRadius: 4,
         pointBackgroundColor: 'rgb(139, 92, 246)',

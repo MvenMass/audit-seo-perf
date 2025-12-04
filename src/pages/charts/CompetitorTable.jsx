@@ -1,36 +1,8 @@
-function CompetitorTable() {
-  const competitors = [
-    {
-      domain: 'сайт клиента',
-      age: '13 лет 3 мес 10 дней',
-      source: 'источник',
-      info: 'информация'
-    },
-    {
-      domain: 'сайт клиента',
-      age: '13 лет 3 мес 10 дней',
-      source: 'источник',
-      info: 'информация'
-    },
-    {
-      domain: 'сайт клиента',
-      age: '13 лет 3 мес 10 дней',
-      source: 'источник',
-      info: 'информация'
-    },
-    {
-      domain: 'сайт клиента',
-      age: '13 лет 3 мес 10 дней',
-      source: 'источник',
-      info: 'информация'
-    },
-    {
-      domain: 'сайт клиента',
-      age: '13 лет 3 мес 10 дней',
-      source: 'источник',
-      info: 'информация'
-    }
-  ];
+function CompetitorTable({ competitors = [] }) {
+  // Fallback если пропс не передан
+  if (!competitors || competitors.length === 0) {
+    return <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>Нет данных о конкурентах</div>;
+  }
 
   return (
     <div className="competitor-table-container">

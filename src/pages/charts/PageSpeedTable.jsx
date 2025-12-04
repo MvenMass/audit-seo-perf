@@ -1,54 +1,30 @@
 import React from 'react';
 
-function PageSpeedTable() {
-  const tableData = [
-    {
-      metric: 'Скорость загрузки',
-      mobile: '38/100',
-      desktop: '37/100'
-    },
-    {
-      metric: 'First Contentful Paint',
-      mobile: '0.4 s',
-      desktop: '10.7 s'
-    },
-    {
-      metric: 'Speed Index',
-      mobile: '3.6 s',
-      desktop: '10.7 s'
-    },
-    {
-      metric: 'Time to Interactive',
-      mobile: '6.8 s',
-      desktop: '24.6 s'
-    },
-    {
-      metric: 'Total Blocking Time',
-      mobile: '920 ms',
-      desktop: '200 ms'
-    },
-    {
-      metric: 'Cumulative Layout Shift',
-      mobile: '0.104',
-      desktop: '0.314'
-    }
-  ];
-
-  const siteUrl = 'https://press-kod.ru/';
+function PageSpeedTable({ pageSpeed = [], siteUrl = 'https://example.com' }) {
+  // Fallback если нет данных
+  if (!pageSpeed || pageSpeed.length === 0) {
+    return (
+      <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>
+        Нет данных о скорости загрузки
+      </div>
+    );
+  }
 
   return (
     <div className="traffic-table-container">
-      {/* Wrapper с радиусом вокруг всей таблицы */}
       <div className="table-wrapper">
         <table className="traffic-table">
           <thead>
-            {/* Заголовок интегрирован в таблицу: colSpan="3" для центрирования */}
+            {/* Заголовок с URL сайта */}
             <tr>
               <th colSpan="3" className="pagespeed-site-header">
-                Результаты PageSpeed для: <a href={siteUrl} target="_blank" rel="noopener noreferrer">{siteUrl}</a>
+                Результаты PageSpeed для:{' '}
+                <a href={siteUrl} target="_blank" rel="noopener noreferrer">
+                  {siteUrl}
+                </a>
               </th>
             </tr>
-            {/* Обычные заголовки колонок */}
+            {/* Заголовки колонок */}
             <tr>
               <th>Показатель</th>
               <th>Mobile</th>
@@ -56,7 +32,7 @@ function PageSpeedTable() {
             </tr>
           </thead>
           <tbody>
-            {tableData.map((row, idx) => (
+            {pageSpeed.map((row, idx) => (
               <tr key={idx}>
                 <td>{row.metric}</td>
                 <td>{row.mobile}</td>

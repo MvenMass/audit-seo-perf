@@ -19,56 +19,30 @@ ChartJS.register(
   Legend
 );
 
-function RobotsChart() {
+function RobotsChart({ robotsData = {}, robotsTableData = [] }) {
   const [activeTab, setActiveTab] = useState('top1');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 9;
 
-  // Данные для каждого таба
-  const tabsData = {
-    top1: {
-      title: 'Запросы в ТОП 1',
-      data: [120, 80, 95, 110, 105]
-    },
-    top3: {
-      title: 'Запросы в ТОП 3',
-      data: [180, 140, 160, 170, 165]
-    },
-    top5: {
-      title: 'Запросы в ТОП 5',
-      data: [240, 200, 220, 230, 225]
-    },
-    percentage: {
-      title: 'Процент в ТОП 5',
-      data: [65, 45, 55, 60, 58]
-    },
-    pages: {
-      title: 'Страницы в индексе',
-      data: [450, 420, 440, 460, 450]
-    },
-    traffic: {
-      title: 'Посещаемость в день',
-      data: [145, 120, 135, 150, 140]
-    }
-  };
+  // Fallback если нет данных
+  if (!robotsData || Object.keys(robotsData).length === 0) {
+    return <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>Нет данных robots</div>;
+  }
 
-  const labels = ['Домен 1', 'Домен 2', 'Домен 3', 'Домен 4', 'Домен 5'];
-  const currentTabData = tabsData[activeTab];
+  const currentTabData = robotsData[activeTab];
 
-  // Данные для таблицы
-  const allRows = Array.from({ length: 75 }, (_, i) => ({
-    id: i + 1,
-    status: i % 3 === 0 ? 'Строка' : i % 3 === 1 ? 'Условие' : 'Результат',
-    query: `user-agent #${i + 1}`,
-    info: 'Yandex'
-  }));
+  if (!currentTabData) {
+    return <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>Нет данных</div>;
+  }
+
+  const labels = currentTabData.labels || [];
+  const allRows = robotsTableData.length > 0 ? robotsTableData : [];
 
   const totalPages = Math.ceil(allRows.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const tableRows = allRows.slice(startIndex, endIndex);
 
-  // Генерация номеров страниц для пагинации
   const getPageNumbers = () => {
     const pages = [];
     const maxPagesToShow = 5;
@@ -101,27 +75,24 @@ function RobotsChart() {
 
   const pageNumbers = getPageNumbers();
 
-const options = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: { display: false },
-    tooltip: { mode: 'index', intersect: false }
-  },
-  scales: {
-    x: {
-      grid: { display: false },
-      offset: true,
-      // min: -0.5,
-      // max: labels.length - 0.5,
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: { mode: 'index', intersect: false }
     },
-    y: {
-      beginAtZero: true,
-      grid: { color: 'rgba(0, 0, 0, 0.05)' }
+    scales: {
+      x: {
+        grid: { display: false },
+        offset: true
+      },
+      y: {
+        beginAtZero: true,
+        grid: { color: 'rgba(0, 0, 0, 0.05)' }
+      }
     }
-  }
-};
-
+  };
 
   const chartData = {
     labels,
@@ -172,7 +143,7 @@ const options = {
         marginTop: '20px',
         background: 'white',
         borderRadius: '8px',
-        padding: '20px 40px 60px', // внутренние отступы по бокам
+        padding: '20px 40px 60px',
         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
       }}>
         <Bar options={options} data={chartData} />
@@ -199,31 +170,33 @@ const options = {
           </tbody>
         </table>
 
-        <div className="pagination">
-          <div className="pagination-buttons">
-            {pageNumbers.map((page, idx) => (
-              <button
-                key={idx}
-                className={`pagination-btn ${
-                  page === currentPage ? 'active' : ''
-                } ${page === '...' ? 'dots' : ''}`}
-                onClick={() => typeof page === 'number' && setCurrentPage(page)}
-                disabled={page === '...'}
-              >
-                {page}
-              </button>
-            ))}
-            {currentPage < totalPages && (
-              <button
-                className="pagination-btn arrow-btn"
-                onClick={() => setCurrentPage(currentPage + 1)}
-                title="Следующая страница"
-              >
-                →
-              </button>
-            )}
+        {totalPages > 1 && (
+          <div className="pagination">
+            <div className="pagination-buttons">
+              {pageNumbers.map((page, idx) => (
+                <button
+                  key={idx}
+                  className={`pagination-btn ${
+                    page === currentPage ? 'active' : ''
+                  } ${page === '...' ? 'dots' : ''}`}
+                  onClick={() => typeof page === 'number' && setCurrentPage(page)}
+                  disabled={page === '...'}
+                >
+                  {page}
+                </button>
+              ))}
+              {currentPage < totalPages && (
+                <button
+                  className="pagination-btn arrow-btn"
+                  onClick={() => setCurrentPage(currentPage + 1)}
+                  title="Следующая страница"
+                >
+                  →
+                </button>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

@@ -1,15 +1,17 @@
-function SSLReportTable() {
+function SSLReportTable({ ssl = {} }) {
   const sslData = [
-    { label: 'Субъект', value: 'press-kod.ru' },
-    { label: 'Эмитент', value: 'R11' },
-    { label: 'Действителен с', value: 'Aug 4 06:48:25 2025 GMT' },
-    { label: 'Действителен до', value: 'Nov 2 06:48:24 2025 GMT' },
-    { label: 'Статус', value: 'Сертификат действителен', isStatus: true },
-    { label: 'Серийный номер', value: '0542814B9BCFF25CB645920E3A70E8E9426E' },
-    { label: 'Алгоритм подписи', value: 'Неизвестен' },
-    { label: 'Дополнительные субъекты (SAN)', value: 'DNS:press-kod.ru, DNS:www.press-kod.ru' },
-    { label: 'Самоподписанный', value: 'Нет' }
+    { label: 'Субъект', value: ssl.owner || 'N/A' },
+    { label: 'Эмитент', value: ssl.issuer || 'N/A' },
+    { label: 'Действителен с', value: ssl.validFrom || 'N/A' },
+    { label: 'Действителен до', value: ssl.validTo || 'N/A' },
+    { label: 'Статус', value: ssl.status || 'N/A', isStatus: true },
+    { label: 'Серийный номер', value: ssl.serialNumber || 'N/A' },
+    { label: 'Отпечаток', value: ssl.thumbprint || 'N/A' }
   ];
+
+  if (!ssl || Object.keys(ssl).length === 0) {
+    return <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>Нет данных SSL</div>;
+  }
 
   return (
     <div className="ssl-report-container">
@@ -18,7 +20,7 @@ function SSLReportTable() {
           {sslData.map((row, idx) => (
             <tr key={idx} className="ssl-report-row">
               <td className="ssl-report-label">{row.label}</td>
-              <td className={`ssl-report-value ${row.isStatus ? 'ssl-status-active' : ''}`}>
+              <td className={`ssl-report-value ${row.isStatus && row.value.includes('действител') ? 'ssl-status-active' : ''}`}>
                 {row.value}
               </td>
             </tr>

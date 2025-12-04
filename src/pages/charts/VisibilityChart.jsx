@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
-import './VisibilityChart.css';
 
-function VisibilityChart() {
+function VisibilityChart({ visibility = {} }) {
   const chartRef = useRef(null);
   const chartInstanceRef = useRef(null);
   const [chartsReady, setChartsReady] = useState(false);
 
-  useEffect(() => {
-    let killed = false;
+  const { commercial = 0, nonCommercial = 0, total = 0 } = visibility;
 
+  if (!visibility || total === 0) {
+    return <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>Нет данных видимости</div>;
+  }
+
+  useEffect(() => {
     const checkAndInit = () => {
       if (
         window.am4core &&
@@ -54,7 +57,6 @@ function VisibilityChart() {
     }
 
     return () => {
-      killed = true;
       if (chartInstanceRef.current) {
         chartInstanceRef.current.dispose();
       }
@@ -78,8 +80,8 @@ function VisibilityChart() {
       chart.angle = 15;
 
       chart.data = [
-        { category: 'Коммерческие', value: 292 },
-        { category: 'Некоммерческие', value: 530 }
+        { category: 'Коммерческие', value: commercial },
+        { category: 'Некоммерческие', value: nonCommercial }
       ];
 
       const series = chart.series.push(new window.am4charts.PieSeries3D());
@@ -122,7 +124,7 @@ function VisibilityChart() {
       const hoverState = series.slices.template.states.create('hover');
       hoverState.properties.scale = 1.05;
     } catch (error) {
-      // Do nothing
+      console.error('Chart error:', error);
     }
 
     return () => {
@@ -130,7 +132,7 @@ function VisibilityChart() {
         chartInstanceRef.current.dispose();
       }
     };
-  }, [chartsReady]);
+  }, [chartsReady, commercial, nonCommercial]);
 
   return (
     <div className="visibility-container">
@@ -145,9 +147,9 @@ function VisibilityChart() {
           </thead>
           <tbody>
             <tr>
-              <td>292</td>
-              <td>530</td>
-              <td>822</td>
+              <td>{commercial}</td>
+              <td>{nonCommercial}</td>
+              <td>{total}</td>
             </tr>
           </tbody>
         </table>

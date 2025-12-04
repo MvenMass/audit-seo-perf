@@ -1,6 +1,15 @@
 import React from 'react';
 
-function FaviconChart() {
+function FaviconChart({ favicon = [] }) {
+  // Fallback если нет данных
+  if (!favicon || favicon.length === 0) {
+    return (
+      <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>
+        Фавикон не найден
+      </div>
+    );
+  }
+
   return (
     <div className="traffic-table-container">
       <table className="traffic-table">
@@ -13,19 +22,14 @@ function FaviconChart() {
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td>https://press-kod.ru/favicon.ico</td>
-            <td>image/x-icon</td>
-            <td>N/A KB</td>
-            <td>HTML tag</td>
-          </tr>
-          {/* Если есть дубликат, добавьте вторую строку: */}
-          <tr>
-            <td>https://press-kod.ru/favicon.ico</td>
-            <td>image/x-icon</td>
-            <td>N/A KB</td>
-            <td>HTML tag</td>
-          </tr>
+          {favicon.map((item, idx) => (
+            <tr key={idx}>
+              <td>{item.site}</td>
+              <td>{item.type}</td>
+              <td>{item.size}</td>
+              <td>{item.method}</td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>

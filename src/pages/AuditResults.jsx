@@ -1,3 +1,4 @@
+import { useAuditData } from '../hooks/useAuditData';
 import { useLocation } from "react-router-dom";
 import "./AuditResults.css";
 import CardNav from "../components/CardNav";
@@ -14,7 +15,7 @@ import PositionStatsChart from "./charts/PositionStatsChart";
 import SemanticKeywordsTable from "./charts/SemanticKeywordsTable";
 import FaviconChart from "./charts/FaviconChart";
 import PageSpeedTable from "./charts/PageSpeedTable";
-import SitemapSummary from './charts/SitemapSummary'; // путь корректируйте по структуре проекта
+import SitemapSummary from './charts/SitemapSummary';
 import Footer from '../components/Footer';
 import LogoLoop from '../components/LogoLoop';
 import AboutUsNumber from '../components/AboutUsNumber';
@@ -38,10 +39,21 @@ const imageLogos = [
 ];
 
 function AuditResults() {
+  // ✅ СНАЧАЛА получаем location
   const location = useLocation();
+  
+  // ✅ ПОТОМ используем его
+  const auditDataFromBackend = location.state?.auditData;
   const formData = location.state?.formData;
+  
+  // ✅ Загружаем данные (либо от backend, либо fallback JSON)
+  const { data: auditData, loading, error } = useAuditData(
+    auditDataFromBackend || '/auditData.json'
+  );
+  
+  if (loading) return <div style={{ textAlign: 'center', padding: '100px' }}>Загрузка...</div>;
+  if (error) return <div style={{ textAlign: 'center', padding: '100px', color: 'red' }}>Ошибка: {error}</div>;
 
-  // Данные для навигации (как в App.jsx)
   const items = [
     {
       label: "About",
@@ -75,7 +87,6 @@ function AuditResults() {
 
   return (
     <div className="audit-results">
-      {/* Используем CardNav вместо простого header */}
       <CardNav
         logo={logo}
         logoAlt="Company Logo"
@@ -88,11 +99,10 @@ function AuditResults() {
       />
 
       <div className="audit-container">
-        {/* Заголовок и описание - занимает всю ширину */}
         <div className="audit-title-section">
           <h1 className="audit-title">
             Аудит для сайта{" "}
-            <span className="site-url">{formData?.site || "www.site.ru"}</span>
+            <span className="site-url">{formData?.site || auditData?.domainInfo?.site || "www.site.ru"}</span>
           </h1>
           <p className="audit-description">
             Мы сделали для вас понятный разбор: где ошибки, какие элементы стоит
@@ -101,80 +111,62 @@ function AuditResults() {
           </p>
         </div>
 
-        {/* Метрики - занимает всю ширину */}
         <div className="metrics-grid">
-          <div className="metric-card">
-            <div className="metric-label">Возраст домена:</div>
-            <div className="metric-value">
-              13 лет 3 месяцев 10 дней (4845 days)
+          {auditData?.metrics?.map((metric, idx) => (
+            <div key={idx} className="metric-card">
+              <div className="metric-label">{metric.label}</div>
+              <div className={`metric-value ${metric.highlight ? 'metric-highlight' : ''} ${metric.success ? 'metric-success' : ''}`}>
+                {metric.value}
+              </div>
             </div>
-          </div>
-          <div className="metric-card">
-            <div className="metric-label">% запросов в ТОП:</div>
-            <div className="metric-value metric-highlight">10%</div>
-          </div>
-          <div className="metric-card">
-            <div className="metric-label">Наличие SSL:</div>
-            <div className="metric-value metric-success">есть</div>
-          </div>
-          <div className="metric-card">
-            <div className="metric-label">Наличие robots.txt:</div>
-            <div className="metric-value metric-success">есть</div>
-          </div>
+          ))}
         </div>
 
-        {/* Основная сетка: 2-колоночный макет начинается здесь */}
         <div className="audit-wrapper">
-          {/* Левая колонка - Оглавление */}
-       <aside className="audit-sidebar">
-  <div className="table-of-contents">
-    <h2 className="section-title sidebar-title">Оглавление:</h2>
-    <ol className="toc-list">
-    
-      <li>
-        <a href="#domain-age" className="toc-link">Возраст доменов</a>
-      </li>
+          <aside className="audit-sidebar">
+            <div className="table-of-contents">
+              <h2 className="section-title sidebar-title">Оглавление:</h2>
+              <ol className="toc-list">
+                <li>
+                  <a href="#domain-age" className="toc-link">Возраст доменов</a>
+                </li>
+                <li>
+                  <a href="#traffic" className="toc-link">Трафик, видимость и CMS</a>
+                </li>
+                <li>
+                  <a href="#top-requests" className="toc-link">История запросов по доменам (ТОП 1/3/5/10/50)</a>
+                </li>
+                <li>
+                  <a href="#semantic-core" className="toc-link">Пересечение семантического ядра с конкурентами</a>
+                </li>
+                <li>
+                  <a href="#seasonality" className="toc-link">Сезонность запросов</a>
+                </li>
+                <li>
+                  <a href="#favicon" className="toc-link">Наличие favicon</a>
+                </li>
+                <li>
+                  <a href="#pagespeed" className="toc-link">Производительность PageSpeed (мобильная и десктопная)</a>
+                </li>
+                <li>
+                  <a href="#ssl-report" className="toc-link">Отчёт о проверке SSL‑сертификата</a>
+                </li>
+                <li>
+                  <a href="#robots" className="toc-link">Проверка файла robots.txt и карта сайта</a>
+                </li>
+                <li>
+                  <a href="#sitemap-summary" className="toc-link">Статистика позиций по запросам (бар‑диаграммы)</a>
+                </li>
+                <li>
+                  <a href="#semantic-keywords" className="toc-link">Семантическое ядро: таблица ключевых слов</a>
+                </li>
+                <li>
+                  <a href="#visibility" className="toc-link">Видимость</a>
+                </li>
+              </ol>
+            </div>
+          </aside>
 
-      <li>
-        <a href="#traffic" className="toc-link">Трафик, видимость и CMS</a>
-      </li>
-      <li>
-        <a href="#top-requests" className="toc-link">История запросов по доменам (ТОП 1/3/5/10/50)</a>
-      </li>
-      <li>
-        <a href="#semantic-core" className="toc-link">Пересечение семантического ядра с конкурентами</a>
-      </li>
-         <li>
-        <a href="#seasonality" className="toc-link">Сезонность запросов</a>
-      </li>
-      <li>
-        <a href="#favicon" className="toc-link">Наличие favicon</a>
-      </li>
-            <li>
-        <a href="#pagespeed" className="toc-link">Производительность PageSpeed (мобильная и десктопная)</a>
-      </li>
-           <li>
-        <a href="#ssl-report" className="toc-link">Отчёт о проверке SSL‑сертификата</a>
-      </li>
-        <li>
-        <a href="#robots" className="toc-link">Проверка файла robots.txt и карта сайта</a>
-      </li>
-        <li>
-        <a href="#sitemap-summary" className="toc-link">Статистика позиций по запросам (бар‑диаграммы)</a>
-      </li>
-      <li>
-        <a href="#semantic-keywords" className="toc-link">Семантическое ядро: таблица ключевых слов</a>
-      </li>
-      <li>
-        <a href="#visibility" className="toc-link">Видимость</a>
-      </li>
-   
-    </ol>
-  </div>
-</aside>
-
-
-          {/* Правая колонка - Основной контент */}
           <main className="audit-main-content">
             {/* Секция: Возрасты доменов */}
             <section className="audit-section" id="domain-age">
@@ -183,7 +175,7 @@ function AuditResults() {
                 Таблица с возрастом сайтов конкурентов в годах и днях позволяет
                 оценить зрелость и авторитетность доменов
               </p>
-              <CompetitorTable />
+              <CompetitorTable competitors={auditData?.competitors} />
             </section>
 
             {/* Секция: Трафик, видимость и CMS */}
@@ -194,7 +186,7 @@ function AuditResults() {
                 индексе, запросах в топ-5/10/50 и среднем органическом трафике в
                 день
               </p>
-              <TrafficTable />
+              <TrafficTable traffic={auditData?.traffic} />
             </section>
 
             {/* Секция: История запросов в ТОП */}
@@ -207,7 +199,7 @@ function AuditResults() {
                 сайта в ТОП - 1, 3, 5, 10 и 50 за 2 года, что помогает
                 анализировать динамику видимости
               </p>
-              <TopDomainsChart />
+              <TopDomainsChart topDomainsChart={auditData?.topDomainsChart} />
             </section>
 
             {/* Секция: Пересечение семантического ядра */}
@@ -220,7 +212,7 @@ function AuditResults() {
                 сколько уникальных у сайта и сколько упущено, дополняется
                 краткой таблицей
               </p>
-              <SemanticCoreChart />
+              <SemanticCoreChart semanticCore={auditData?.semanticCore} />
             </section>
 
             {/* Секция: Сезонность запросов */}
@@ -231,7 +223,7 @@ function AuditResults() {
                 некоммерческих запросов по месяцам; помогает выявить пики спроса
                 и сезонные провалы
               </p>
-              <SeasonalityChart />
+              <SeasonalityChart seasonalityData={auditData?.seasonality} />
             </section>
 
             {/* Секция: Наличие фавикона */}
@@ -242,18 +234,17 @@ function AuditResults() {
                 (кликабельность) и тем самым дает поисковикам позитивный сигнал,
                 укрепляющий позиции сайта.
               </p>
-              <FaviconChart />
+              <FaviconChart favicon={auditData?.favicon} />
             </section>
 
             {/* Секция: PageSpeed */}
-<section className="audit-section" id="pagespeed">
-  <h2 className="section-title">Скорость загрузки сайта (PageSpeed)</h2>
-  <p className="section-description">
-    Сравнение Mobile и Desktop по ключевым метрикам: насколько быстро появляется контент, когда страница становится интерактивной и насколько стабильна верстка.
-  </p>
-  <PageSpeedTable />
-</section>
-
+            <section className="audit-section" id="pagespeed">
+              <h2 className="section-title">Скорость загрузки сайта (PageSpeed)</h2>
+              <p className="section-description">
+                Сравнение Mobile и Desktop по ключевым метрикам: насколько быстро появляется контент, когда страница становится интерактивной и насколько стабильна верстка.
+              </p>
+              <PageSpeedTable pageSpeed={auditData?.pageSpeed} siteUrl={auditData?.domainInfo?.siteUrl} />
+            </section>
 
             {/* Секция: SSL Отчет */}
             <section className="audit-section" id="ssl-report">
@@ -262,44 +253,58 @@ function AuditResults() {
                 Сведения о SSL: владелец, эмитент, срок действия, серийный номер
                 и статус сертификата (действителен / недействителен)
               </p>
-              <SSLReportTable />
+              <SSLReportTable ssl={auditData?.ssl} />
             </section>
 
-             {/* Секция: Проверка robots.txt и sitemap */}
+            {/* Секция: Проверка robots.txt и sitemap */}
             <section className="audit-section" id="robots">
               <h2 className="section-title">Проверка robots.txt и sitemap</h2>
               <div className="robots-check">
                 <div className="robots-status">
-                  <strong>Код ответа:</strong> 200
+                  <strong>Код ответа:</strong> {auditData?.robots?.httpStatus || 200}
                 </div>
                 <div className="robots-status">
-                 Файл robots.txt найден
+                  {auditData?.robots?.found ? 'Файл robots.txt найден' : 'Файл robots.txt не найден'}
                 </div>
                 <div className="robots-status">
-                  <strong>Результаты анализа:</strong> ошибок не обнаружено
+                  <strong>Результаты анализа:</strong> {auditData?.robots?.errors ? 'обнаружены ошибки' : 'ошибок не обнаружено'}
                 </div>
-                <div className="robots-info">
-                  <strong>Информация:</strong>
-                  <ul>
-                    <li>Блок User-agent начинается в строке 1: "Yandex"</li>
-                    <li>Блок User-agent начинается в строке 18: "Googlebot"</li>
-                    <li>Блок User-agent начинается в строке 39: "Slurp"</li>
-                  </ul>
-                </div>
+                {auditData?.robots?.blocks && auditData.robots.blocks.length > 0 && (
+                  <div className="robots-info">
+                    <strong>Информация:</strong>
+                    <ul>
+                      {auditData.robots.blocks.map((block, idx) => (
+                        <li key={idx}>{block.rule}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
-              <RobotsChart />
+              <RobotsChart 
+                robotsData={auditData?.robotsData} 
+                robotsTableData={auditData?.robotsTableData}
+              />
             </section>
-{/* Секция: Итоговая статистика карты сайта */}
-<section className="audit-section" id="sitemap-summary">
-  <h2 className="section-title">Итоговая статистика проверки карты сайта</h2>
-  <p className="section-description">
-    Здесь мы фиксируем, открыт ли sitemap для роботов (HTTP-статус), сколько в нём URL и есть ли подозрительные элементы — дубликаты, недоступные или закрытые страницы. Используйте блок как быстрый индикатор качества карты.
-  </p>
-  <SitemapSummary />
-</section>
 
+            {/* Секция: Итоговая статистика карты сайта */}
+            <section className="audit-section" id="sitemap-summary">
+              <h2 className="section-title">Итоговая статистика проверки карты сайта</h2>
+              <p className="section-description">
+                Здесь мы фиксируем, открыт ли sitemap для роботов (HTTP-статус), сколько в нём URL и есть ли подозрительные элементы — дубликаты, недоступные или закрытые страницы. Используйте блок как быстрый индикатор качества карты.
+              </p>
+              <SitemapSummary sitemap={auditData?.robots} />
+            </section>
 
-   {/* Секция: Семантическое ядро: таблица ключевых слов */}
+            {/* Секция: Позиции по запросам */}
+            <section className="audit-section" id="position-stats">
+              <h2 className="section-title">Статистика позиций по запросам</h2>
+              <p className="section-description">
+                Интерактивные столбчатые диаграммы показывают, как распределяются запросы по доменам в зависимости от позиции (ТОП-1, ТОП-3, ТОП-5 и т.д.)
+              </p>
+              <PositionStatsChart positionStats={auditData?.positionStats} />
+            </section>
+
+            {/* Секция: Семантическое ядро: таблица ключевых слов */}
             <section className="audit-section" id="semantic-keywords">
               <h2 className="section-title">
                 Семантическое ядро: таблица ключевых слов
@@ -315,7 +320,7 @@ function AuditResults() {
                 контент-план; без него легко оптимизировать «не те» страницы и
                 терять потенциальный трафик.
               </div>
-              <SemanticKeywordsTable />
+              <SemanticKeywordsTable keywords={auditData?.semanticKeywords} />
             </section>
 
             {/* Секция: Видимость */}
@@ -327,35 +332,28 @@ function AuditResults() {
                 долям понятно, где усилить коммерческие кластеры и где расширить
                 информационный контент.
               </p>
-              <VisibilityChart />
+              <VisibilityChart visibility={auditData?.visibility} />
             </section>
-
-
-         
-
-       
           </main>
         </div>
-        
       </div>
+
       <AboutUsNumber />
-          <div style={{ height: '200px', position: 'relative', overflow: 'hidden', opacity: '0.8'}}>
-      <LogoLoop
-        logos={imageLogos}
-        speed={40}
-        direction="left"
-        logoHeight={68}
-        gap={100}
-        pauseOnHover={false}
-        scaleOnHover
-        fadeOut
-        fadeOutColor="#ffffff"
-        ariaLabel="Technology partners"
-      />
-    </div>
-     <Footer
-     logo={logo}
-  logoAlt="Company Logo"/>
+      <div style={{ height: '200px', position: 'relative', overflow: 'hidden', opacity: '0.8'}}>
+        <LogoLoop
+          logos={imageLogos}
+          speed={40}
+          direction="left"
+          logoHeight={68}
+          gap={100}
+          pauseOnHover={false}
+          scaleOnHover
+          fadeOut
+          fadeOutColor="#ffffff"
+          ariaLabel="Technology partners"
+        />
+      </div>
+      <Footer logo={logo} logoAlt="Company Logo" />
     </div>
   );
 }

@@ -1,37 +1,35 @@
 import { useState } from 'react';
 
-function SemanticKeywordsTable() {
+function SemanticKeywordsTable({ keywords = { total: 0, data: [] } }) {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 15;
 
-  // Пример данных - замени на реальные данные с бэкенда
-  const allKeywords = Array.from({ length: 150 }, (_, i) => ({
-    id: i + 1,
-    keyword: `printair зеленоград ${i + 1}`,
-    frequency: 1,
-    top1: 12 + Math.floor(Math.random() * 30),
-    top5: 123 + Math.floor(Math.random() * 200),
-    top10: 1234 + Math.floor(Math.random() * 500)
-  }));
+  const allKeywords = keywords.data || [];
+
+  if (!allKeywords || allKeywords.length === 0) {
+    return <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>Нет данных ключевых слов</div>;
+  }
 
   const totalPages = Math.ceil(allKeywords.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const currentData = allKeywords.slice(startIndex, endIndex);
 
-  // Генерация номеров страниц для отображения
   const getPageNumbers = () => {
     const pages = [];
     const maxPagesToShow = 5;
     const maxDotsPages = 3;
+
     if (totalPages <= maxPagesToShow + 2) {
       for (let i = 1; i <= totalPages; i++) pages.push(i);
     } else {
       pages.push(1);
       let startPage = Math.max(2, currentPage - 1);
       let endPage = Math.min(totalPages - 1, currentPage + 1);
+
       if (currentPage <= 3) endPage = Math.min(totalPages - 1, maxDotsPages + 1);
       if (currentPage > totalPages - 3) startPage = Math.max(2, totalPages - maxDotsPages);
+
       if (startPage > 2) pages.push('...');
       for (let i = startPage; i <= endPage; i++) pages.push(i);
       if (endPage < totalPages - 1) pages.push('...');
@@ -45,7 +43,6 @@ function SemanticKeywordsTable() {
   const handlePageChange = (page) => {
     if (typeof page === 'number') {
       setCurrentPage(page);
-      // Скроллим к нашей уникальной таблице
       document.getElementById('semantic-keywords-table')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   };
@@ -82,35 +79,34 @@ function SemanticKeywordsTable() {
         </tbody>
       </table>
 
-      {/* Пагинация */}
-      <div className="pagination">
-        <div className="pagination-buttons">
-          {pageNumbers.map((page, idx) => (
-            <button
-              key={idx}
-              className={`pagination-btn ${
-                page === currentPage ? 'active' : ''
-              } ${page === '...' ? 'dots' : ''}`}
-              onClick={() => handlePageChange(page)}
-              disabled={page === '...'}
-            >
-              {page}
-            </button>
-          ))}
+      {totalPages > 1 && (
+        <div className="pagination">
+          <div className="pagination-buttons">
+            {pageNumbers.map((page, idx) => (
+              <button
+                key={idx}
+                className={`pagination-btn ${
+                  page === currentPage ? 'active' : ''
+                } ${page === '...' ? 'dots' : ''}`}
+                onClick={() => handlePageChange(page)}
+                disabled={page === '...'}
+              >
+                {page}
+              </button>
+            ))}
 
-          {/* Стрелка вперед */}
-          <button
-            className="pagination-btn arrow-btn"
-            onClick={handleNextPage}
-            disabled={currentPage === totalPages}
-            title="Следующая страница"
-          >
-            →
-          </button>
+            {currentPage < totalPages && (
+              <button
+                className="pagination-btn arrow-btn"
+                onClick={handleNextPage}
+                title="Следующая страница"
+              >
+                →
+              </button>
+            )}
+          </div>
         </div>
-
-        
-      </div>
+      )}
     </div>
   );
 }

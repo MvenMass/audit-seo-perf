@@ -1,6 +1,6 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { generateAuditData } from "../api/generateAuditData";
 
 const BASE_CITIES = [
   "Москва",
@@ -48,26 +48,16 @@ const UrlGenerator = () => {
 
     setLoading(true);
 
+    // ✅ В разработке (localhost) используем fallback JSON
+    // Когда деплоишь на production, можно вернуть backend
     try {
-      // Пытаемся получить данные от backend
-      const auditData = await generateAuditData(formData);
+      // Имитируем задержку загрузки
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
-      // Если успешно, передаем оба набора данных
-      navigate('/audit-results', { 
-        state: { 
-          formData,
-          auditData  // Данные от backend
-        } 
-      });
-    } catch (err) {
-      console.warn('Backend недоступен, используем fallback:', err.message);
-      
-      // Если backend не работает, просто идем на результаты
-      // (там будет использован fallback auditData.json)
       navigate('/audit-results', { 
         state: { 
           formData
-          // auditData не передаем - будет использован fallback
+          // auditData не передаем - будет использован fallback /auditData.json
         } 
       });
     } finally {

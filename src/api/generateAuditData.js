@@ -50,7 +50,8 @@ export const generateAuditData = async (params) => {
     url2: competitors[0] || '',
     url3: competitors[1] || '',
     url4: competitors[2] || '',
-    url5: competitors[3] || ''
+    url5: competitors[3] || '',
+    url6: competitors[4] || ''
   };
 
   console.log('[generateAuditData] 📤 Отправляем запрос к backend:', {

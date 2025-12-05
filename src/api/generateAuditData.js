@@ -41,13 +41,19 @@ const buildPayload = ({ city, site, competitors }) => {
   };
 };
 
-export const generateAuditData = async (params) => {
+export const generateAuditData = async (params, onProgress) => {
   const payload = buildPayload(params);
   
   console.log('[generateAuditData] 📤 Отправляем:', payload);
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 40 * 60 * 1000);
+  
+  // ⚠️ ВАЖНО: браузер сам может отменить запрос раньше (ERR_TIMED_OUT)
+  // Устанавливаем очень большой таймаут, просто для подстраховки
+  const timeout = setTimeout(() => {
+    console.log('[generateAuditData] ⏱️ AbortController timeout срабатывает');
+    controller.abort();
+  }, 10 * 60 * 1000); // 10 минут для AbortController (очень много)
 
   try {
     const response = await fetch(`${API_BASE_URL}/generate-url`, {
@@ -67,8 +73,18 @@ export const generateAuditData = async (params) => {
   } catch (error) {
     clearTimeout(timeout);
     
+    console.error('[generateAuditData] Ошибка:', error.name, error.message);
+    
     if (error.name === 'AbortError') {
-      throw new Error('Timeout: анализ занял более 40 минут');
+      throw new Error('Timeout: запрос отменён (10+ минут)');
+    }
+    
+    // Специальная обработка ERR_TIMED_OUT
+    if (error.message.includes('Failed to fetch')) {
+      throw new Error(
+        'Анализ занял слишком долго или сервер недоступен. ' +
+        'Попробуйте позже.'
+      );
     }
     
     throw error;

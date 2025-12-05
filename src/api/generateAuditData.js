@@ -1,12 +1,5 @@
-/**
- * API клиент для генерации данных аудита
- * PRODUCTION версия - работает с реальным backend
- * Поддерживает долгие запросы за счет увеличенного timeout-контроля
- */
-
 const API_BASE_URL = '/api';
 
-// Маппинг городов на cityCode и cityId
 const cityMapping = {
   'Москва': { cityCode: 'msk', cityId: 213 },
   'Ростов-на-Дону': { cityCode: 'rnd', cityId: 39 },
@@ -29,109 +22,85 @@ const cityMapping = {
   'Тюмень': { cityCode: 'tum', cityId: 60 }
 };
 
-// 1 час в миллисекундах
-const REQUEST_TIMEOUT_MS = 60 * 60 * 1000;
+const REQUEST_TIMEOUT_MS = 60 * 60 * 1000; // 1 час
 
-/**
- * Генерирует данные аудита через backend
- * @param {object} params - параметры запроса
- * @param {string} params.city - название города
- * @param {string} params.site - основной сайт
- * @param {array} params.competitors - массив сайтов конкурентов
- * @returns {object} - данные аудита или ошибка
- */
-export const generateAuditData = async (params) => {
-  const { city, site, competitors } = params;
-
+const buildPayload = ({ city, site, competitors }) => {
   const cityInfo = cityMapping[city];
+
   if (!cityInfo) {
     throw new Error(`Город "${city}" не найден в справочнике`);
   }
 
-  const payload = {
+  const urls = [site, ...(competitors || [])];
+
+  return {
     cityCode: cityInfo.cityCode,
     cityId: cityInfo.cityId,
-    url1: site,
-    url2: competitors[0] || '',
-    url3: competitors[1] || '',
-    url4: competitors[2] || '',
-    url5: competitors[3] || '',
-    url6: competitors[4] || ''
+    url1: urls[0] || '',
+    url2: urls[1] || '',
+    url3: urls[2] || '',
+    url4: urls[3] || '',
+    url5: urls[4] || '',
+    url6: urls[5] || ''
   };
+};
 
-  console.log('[generateAuditData] 📤 Отправляем запрос к backend:', {
-    url: `${API_BASE_URL}/generate-url`,
-    payload,
-    timeoutMs: REQUEST_TIMEOUT_MS
-  });
-
+const fetchWithTimeout = async (url, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) => {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => {
-    controller.abort();
-  }, REQUEST_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const startTime = Date.now();
-
-    const response = await fetch(`${API_BASE_URL}/generate-url`, {
-      method: 'POST',
-      referrerPolicy: 'unsafe-url',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify(payload),
+    const response = await fetch(url, {
+      ...options,
       signal: controller.signal
     });
 
-    clearTimeout(timeoutId);
-
-    const elapsedTime = Math.round((Date.now() - startTime) / 1000);
-    const minutes = Math.floor(elapsedTime / 60);
-    const seconds = elapsedTime % 60;
-    console.log(`[generateAuditData] ✅ Ответ получен за ${minutes}м ${seconds}с`);
-
     if (!response.ok) {
       const errorText = await response.text().catch(() => '');
-      console.error(`[generateAuditData] ❌ Backend error: ${response.status}`);
-      console.error('[generateAuditData] Response:', errorText);
       throw new Error(`Backend error: ${response.status} - ${errorText}`);
     }
 
-    const data = await response.json();
-    console.log('[generateAuditData] ✅ Данные успешно получены');
-    console.log('[generateAuditData] Data size:', JSON.stringify(data).length, 'байт');
-    return data;
+    return await response.json();
   } catch (error) {
-    clearTimeout(timeoutId);
-
     if (error.name === 'AbortError') {
-      console.error('[generateAuditData] ⏱️ Timeout: запрос был прерван по истечении лимита');
       throw new Error('Timeout: сервер слишком долго не отвечал. Попробуйте позже или сократите объем анализа.');
     }
 
     if (error.message === 'Failed to fetch') {
-      console.error('[generateAuditData] 🌐 Network error: не удается подключиться к серверу');
       throw new Error(
-        'Network error: не удается подключиться к серверу.\n\n' +
-        'Пожалуйста, проверьте:\n' +
-        '1. Запущен ли backend?\n' +
-        '2. Открыт ли порт 8080?\n' +
-        '3. Нет ли проблем с сетью или firewall?'
+        'Network error: не удается подключиться к серверу.\n\n' 
       );
     }
 
     if (error.message.includes('net::ERR_TIMED_OUT')) {
-      console.error('[generateAuditData] ⏱️ Browser timeout: браузер прервал соединение');
       throw new Error(
         'Browser timeout: браузер ожидал ответа слишком долго. ' +
         'Возможна проблема с сетевой инфраструктурой или прокси между браузером и backend.'
       );
     }
 
-    console.error('[generateAuditData] ❌ Error:', error.message);
     throw error;
+  } finally {
+    clearTimeout(timeoutId);
   }
 };
 
+export const generateAuditData = async (params) => {
+  const payload = buildPayload(params);
+
+  return fetchWithTimeout(
+    `${API_BASE_URL}/generate-url`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(payload),
+      referrerPolicy: 'unsafe-url'
+    }
+  );
+};
+
 export default generateAuditData;
+ 

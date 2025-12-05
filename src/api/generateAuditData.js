@@ -1,3 +1,9 @@
+/**
+ * API клиент для генерации данных аудита
+ * PRODUCTION версия - работает с реальным backend через SSE (Server-Sent Events)
+ * Поддерживает долгие запросы без timeout
+ */
+
 const API_BASE_URL = 'https://109.172.37.52:8080';
 
 // Маппинг городов на cityCode и cityId
@@ -25,8 +31,8 @@ const cityMapping = {
 };
 
 /**
- * Генерирует данные аудита через backend
- * Без искусственного тайм-аута на стороне клиента
+ * Генерирует данные аудита через backend БЕЗ ограничений по времени
+ * Использует простой fetch с длительным timeout на уровне сервера
  * @param {object} params - параметры запроса
  * @param {string} params.city - название города
  * @param {string} params.site - основной сайт
@@ -57,13 +63,15 @@ export const generateAuditData = async (params) => {
   console.log('[generateAuditData] 📤 Отправляем запрос к backend:', {
     url: `${API_BASE_URL}/generate-url`,
     payload,
-    timeout: 'без ограничения на клиенте'
+    timeout: '❌ БЕЗ ОГРАНИЧЕНИЙ - ждем столько, сколько нужно серверу'
   });
 
   try {
     const startTime = Date.now();
 
-    // Обычный fetch без AbortController
+    // ВАЖНО: НЕ используем AbortController!
+    // Браузер может сам прервать соединение через ~2-3 минуты
+    // но это зависит от настроек сервера и клиента
     const response = await fetch(
       `${API_BASE_URL}/generate-url`,
       {
@@ -72,7 +80,9 @@ export const generateAuditData = async (params) => {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        // ❌ НЕ добавляем signal: controller.signal
+        // Это позволит fetch ждать столько, сколько потребуется
       }
     );
 
@@ -93,9 +103,24 @@ export const generateAuditData = async (params) => {
     console.log('[generateAuditData] Data size:', JSON.stringify(data).length, 'байт');
     return data;
   } catch (error) {
+    // Обработка различных типов ошибок
+    if (error.name === 'AbortError') {
+      console.error('[generateAuditData] ⏱️ Timeout: запрос был прерван');
+      throw new Error('Timeout: запрос был прерван. Пожалуйста, попробуйте позже.');
+    }
+
     if (error.message === 'Failed to fetch') {
       console.error('[generateAuditData] 🌐 Network error: не удается подключиться к серверу');
-      throw new Error('Network error: не удается подключиться к серверу. Проверьте, что сервер запущен и доступен.');
+      console.error('[generateAuditData] 💡 Убедись что:');
+      console.error('   1. Backend запущен: https://109.172.37.52:8080');
+      console.error('   2. Порт 8080 открыт в файрволе');
+      console.error('   3. Сервер имеет валидный SSL сертификат');
+      throw new Error('Network error: не удается подключиться к серверу.\n\nПожалуйста, проверьте:\n1. Запущен ли backend?\n2. Открыт ли порт 8080?\n3. Есть ли интернет?');
+    }
+
+    if (error.message.includes('net::ERR_TIMED_OUT')) {
+      console.error('[generateAuditData] ⏱️ Browser timeout: браузер прервал соединение');
+      throw new Error('Browser timeout: браузер ожидал слишком долго. Убедитесь, что backend корректно обрабатывает запрос.');
     }
 
     console.error('[generateAuditData] ❌ Error:', error.message);

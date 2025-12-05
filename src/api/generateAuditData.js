@@ -1,4 +1,6 @@
-const API_BASE_URL = '/api';
+// audit-seo-perf/src/api/generateAuditData.js
+
+const API_BASE_URL = 'http://109.172.37.52:8080';
 
 const cityMapping = {
   'Москва': { cityCode: 'msk', cityId: 213 },
@@ -40,8 +42,7 @@ const buildPayload = ({ city, site, competitors }) => {
     url2: urls[1] || '',
     url3: urls[2] || '',
     url4: urls[3] || '',
-    url5: urls[4] || '',
-    url6: urls[5] || ''
+    url5: urls[4] || ''
   };
 };
 
@@ -68,7 +69,8 @@ const fetchWithTimeout = async (url, options = {}, timeoutMs = REQUEST_TIMEOUT_M
 
     if (error.message === 'Failed to fetch') {
       throw new Error(
-        'Network error: не удается подключиться к серверу.\n\n' 
+        'Network error: не удается подключиться к серверу.\n\n' +
+        'Проверьте доступность backend-сервера и настройки CORS / прокси.'
       );
     }
 
@@ -103,4 +105,3 @@ export const generateAuditData = async (params) => {
 };
 
 export default generateAuditData;
- 

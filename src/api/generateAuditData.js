@@ -24,17 +24,11 @@ const cityMapping = {
   'Тюмень': { cityCode: 'tum', cityId: 60 }
 };
 
-// 40 минут — реально нужно для анализа
-const REQUEST_TIMEOUT_MS = 40 * 60 * 1000;
-
 const buildPayload = ({ city, site, competitors }) => {
   const cityInfo = cityMapping[city];
+  if (!cityInfo) throw new Error(`Город "${city}" не найден`);
 
-  if (!cityInfo) {
-    throw new Error(`Город "${city}" не найден в справочнике`);
-  }
-
-  const urls = [site, ...(competitors || [])];
+  const urls = [site, ...competitors].filter(Boolean);
 
   return {
     cityCode: cityInfo.cityCode,
@@ -47,83 +41,36 @@ const buildPayload = ({ city, site, competitors }) => {
   };
 };
 
-const fetchWithTimeout = async (url, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) => {
+export const generateAuditData = async (params) => {
+  const payload = buildPayload(params);
+  
+  console.log('[generateAuditData] 📤 Отправляем:', payload);
+
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  const timeout = setTimeout(() => controller.abort(), 40 * 60 * 1000);
 
   try {
-    console.log('[generateAuditData] 📤 Отправляем запрос:', {
-      url,
-      method: options.method,
-      timeout: `${Math.round(timeoutMs / 1000 / 60)} мин`
-    });
-
-    const response = await fetch(url, {
-      ...options,
+    const response = await fetch(`${API_BASE_URL}/generate-url`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
       signal: controller.signal
     });
 
-    clearTimeout(timeoutId);
+    clearTimeout(timeout);
 
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => '');
-      console.error(`[generateAuditData] ❌ Backend ошибка ${response.status}:`, errorText);
-      throw new Error(`Backend error: ${response.status} - ${errorText}`);
-    }
-
+    if (!response.ok) throw new Error(`Ошибка ${response.status}`);
+    
     const data = await response.json();
-    console.log('[generateAuditData] ✅ Успешный ответ от сервера');
+    console.log('[generateAuditData] ✅ Успех');
     return data;
   } catch (error) {
-    clearTimeout(timeoutId);
-
-    console.error('[generateAuditData] 🔴 Ошибка:', error.message);
-
-    // AbortError — это таймаут
-    if (error.name === 'AbortError') {
-      throw new Error(
-        'Timeout: сервер не ответил за 40 минут. ' +
-        'Анализ больших объёмов данных может занять время. ' +
-        'Попробуйте позже или сократите количество URL.'
-      );
-    }
-
-    // Failed to fetch — обычно сетевая ошибка
-    if (error.message === 'Failed to fetch' || error.message.includes('ERR_TIMED_OUT')) {
-      throw new Error(
-        'Network error: не удается подключиться к серверу.\n\n' +
-        'Проверьте:\n' +
-        '1. Backend запущен на http://109.172.37.52:8080\n' +
-        '2. Порт 8080 открыт в файрволе\n' +
-        '3. Сеть доступна'
-      );
-    }
-
-    throw error;
-  }
-};
-
-export const generateAuditData = async (params) => {
-  try {
-    const payload = buildPayload(params);
+    clearTimeout(timeout);
     
-    console.log('[generateAuditData] 📤 Payload:', payload);
-
-    return await fetchWithTimeout(
-      `${API_BASE_URL}/generate-url`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify(payload),
-        referrerPolicy: 'unsafe-url'
-      },
-      REQUEST_TIMEOUT_MS
-    );
-  } catch (error) {
-    console.error('[generateAuditData] 💥 Fatal error:', error.message);
+    if (error.name === 'AbortError') {
+      throw new Error('Timeout: анализ занял более 40 минут');
+    }
+    
     throw error;
   }
 };

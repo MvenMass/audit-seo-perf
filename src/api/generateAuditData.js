@@ -1,9 +1,3 @@
-/**
- * API клиент для генерации данных аудита
- * PRODUCTION версия - работает с реальным backend
- * Ожидание ответа: 5 МИНУТ (с возможностью прерывания)
- */
-
 const API_BASE_URL = 'https://109.172.37.52:8080';
 
 // Маппинг городов на cityCode и cityId
@@ -32,7 +26,7 @@ const cityMapping = {
 
 /**
  * Генерирует данные аудита через backend
- * Ожидает ответ до 5 минут (с AbortController)
+ * Без искусственного тайм-аута на стороне клиента
  * @param {object} params - параметры запроса
  * @param {string} params.city - название города
  * @param {string} params.site - основной сайт
@@ -62,20 +56,13 @@ export const generateAuditData = async (params) => {
   console.log('[generateAuditData] 📤 Отправляем запрос к backend:', {
     url: `${API_BASE_URL}/generate-url`,
     payload,
-    timeout: '5 минут ⏱️'
+    timeout: 'без ограничения на клиенте'
   });
-
-  // Создаем AbortController для timeout
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => {
-    console.warn('[generateAuditData] ⏱️ Timeout 5 минут достигнут, прерываем запрос');
-    controller.abort();
-  }, 5 * 60 * 1000); // 5 минут
 
   try {
     const startTime = Date.now();
 
-    // Fetch с AbortController
+    // Обычный fetch без AbortController
     const response = await fetch(
       `${API_BASE_URL}/generate-url`,
       {
@@ -84,12 +71,9 @@ export const generateAuditData = async (params) => {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify(payload),
-        signal: controller.signal // Добавляем signal для прерывания
+        body: JSON.stringify(payload)
       }
     );
-
-    clearTimeout(timeoutId);
 
     const elapsedTime = Math.round((Date.now() - startTime) / 1000);
     const minutes = Math.floor(elapsedTime / 60);
@@ -108,14 +92,6 @@ export const generateAuditData = async (params) => {
     console.log('[generateAuditData] Data size:', JSON.stringify(data).length, 'байт');
     return data;
   } catch (error) {
-    clearTimeout(timeoutId);
-
-    // Проверяем тип ошибки
-    if (error.name === 'AbortError') {
-      console.error('[generateAuditData] ⏱️ Timeout: сервер не ответил за 5 минут');
-      throw new Error('Backend timeout: сервер не ответил в течение 5 минут');
-    }
-
     if (error.message === 'Failed to fetch') {
       console.error('[generateAuditData] 🌐 Network error: не удается подключиться к серверу');
       throw new Error('Network error: не удается подключиться к серверу. Проверьте, что сервер запущен и доступен.');

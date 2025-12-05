@@ -1,5 +1,3 @@
-// audit-seo-perf/src/api/generateAuditData.js
-
 const API_BASE_URL = 'http://109.172.37.52:8080';
 
 const cityMapping = {
@@ -41,29 +39,17 @@ const buildPayload = ({ city, site, competitors }) => {
   };
 };
 
-export const generateAuditData = async (params, onProgress) => {
+export const generateAuditData = async (params) => {
   const payload = buildPayload(params);
   
   console.log('[generateAuditData] 📤 Отправляем:', payload);
-
-  const controller = new AbortController();
-  
-  // ⚠️ ВАЖНО: браузер сам может отменить запрос раньше (ERR_TIMED_OUT)
-  // Устанавливаем очень большой таймаут, просто для подстраховки
-  const timeout = setTimeout(() => {
-    console.log('[generateAuditData] ⏱️ AbortController timeout срабатывает');
-    controller.abort();
-  }, 10 * 60 * 1000); // 10 минут для AbortController (очень много)
 
   try {
     const response = await fetch(`${API_BASE_URL}/generate-url`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal: controller.signal
+      body: JSON.stringify(payload)
     });
-
-    clearTimeout(timeout);
 
     if (!response.ok) throw new Error(`Ошибка ${response.status}`);
     
@@ -71,22 +57,7 @@ export const generateAuditData = async (params, onProgress) => {
     console.log('[generateAuditData] ✅ Успех');
     return data;
   } catch (error) {
-    clearTimeout(timeout);
-    
-    console.error('[generateAuditData] Ошибка:', error.name, error.message);
-    
-    if (error.name === 'AbortError') {
-      throw new Error('Timeout: запрос отменён (10+ минут)');
-    }
-    
-    // Специальная обработка ERR_TIMED_OUT
-    if (error.message.includes('Failed to fetch')) {
-      throw new Error(
-        'Анализ занял слишком долго или сервер недоступен. ' +
-        'Попробуйте позже.'
-      );
-    }
-    
+    console.error('[generateAuditData] ❌ Ошибка:', error.message);
     throw error;
   }
 };

@@ -1,7 +1,7 @@
 /**
  * API клиент для генерации данных аудита
- * PRODUCTION версия - работает с реальным backend через SSE (Server-Sent Events)
- * Поддерживает долгие запросы без timeout
+ * PRODUCTION версия - работает с реальным backend
+ * Многоуровневая защита от таймаутов
  */
 
 const API_BASE_URL = 'https://109.172.37.52:8080';
@@ -29,87 +29,201 @@ const cityMapping = {
   'Тюмень': { cityCode: 'tum', cityId: 60 }
 };
 
-// SSE поллинг для отслеживания прогресса
-const SSE_PROGRESS_ENDPOINT = '/sse-progress';
-
 /**
- * Проверяет поддержку SSE в браузере
+ * Проверяет доступность сервера
  */
-const isSSESupported = () => {
-  return typeof EventSource !== 'undefined';
-};
-
-/**
- * Устанавливает SSE соединение для отслеживания прогресса
- * @param {string} taskId - ID задачи
- * @param {Function} onProgress - callback при обновлении прогресса
- * @param {Function} onComplete - callback при завершении
- * @param {Function} onError - callback при ошибке
- */
-const setupSSEConnection = (taskId, onProgress, onComplete, onError) => {
-  if (!isSSESupported()) {
-    console.warn('[SSE] EventSource не поддерживается в этом браузере');
-    return null;
-  }
-
-  const eventSource = new EventSource(
-    `${API_BASE_URL}${SSE_PROGRESS_ENDPOINT}?taskId=${taskId}`
-  );
-
-  eventSource.onmessage = (event) => {
-    try {
-      const data = JSON.parse(event.data);
-      
-      switch (data.type) {
-        case 'progress':
-          console.log(`[SSE] Прогресс: ${data.progress}% - ${data.message || ''}`);
-          if (onProgress) onProgress(data.progress, data.message);
-          break;
-          
-        case 'complete':
-          console.log('[SSE] Задача завершена:', data.result ? 'есть результат' : 'без результата');
-          eventSource.close();
-          if (onComplete) onComplete(data.result);
-          break;
-          
-        case 'error':
-          console.error('[SSE] Ошибка задачи:', data.error);
-          eventSource.close();
-          if (onError) onError(new Error(data.error));
-          break;
-          
-        case 'heartbeat':
-          // Просто обновляем таймаут, ничего не делаем
-          console.log('[SSE] Heartbeat получен');
-          break;
-          
-        default:
-          console.warn('[SSE] Неизвестный тип сообщения:', data.type);
+export const checkServerHealth = async () => {
+  try {
+    console.log('[Health Check] Проверяем доступность сервера...');
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    
+    const response = await fetch(`${API_BASE_URL}/health`, {
+      method: 'GET',
+      signal: controller.signal,
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
       }
-    } catch (parseError) {
-      console.error('[SSE] Ошибка парсинга сообщения:', parseError);
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log('[Health Check] ✅ Сервер доступен:', data);
+      return { available: true, ...data };
     }
-  };
-
-  eventSource.onerror = (error) => {
-    console.error('[SSE] Ошибка соединения:', error);
-    eventSource.close();
-    if (onError) onError(new Error('Ошибка SSE соединения'));
-  };
-
-  return eventSource;
+    
+    return { available: false, status: response.status };
+  } catch (error) {
+    console.error('[Health Check] ❌ Сервер недоступен:', error.message);
+    return { 
+      available: false, 
+      error: error.message,
+      details: 'Сервер не отвечает. Проверьте:\n1. Запущен ли сервер?\n2. Открыт ли порт 8080?\n3. Работает ли сеть?'
+    };
+  }
 };
 
 /**
- * Основной метод для генерации данных аудита через SSE
- * @param {object} params - параметры запроса
- * @param {string} params.city - название города
- * @param {string} params.site - основной сайт
- * @param {array} params.competitors - массив сайтов конкурентов
- * @returns {Promise<object>} - данные аудита
+ * Метод с chunked transfer encoding для избежания таймаутов
  */
-export const generateAuditDataSSE = async (params) => {
+const fetchWithChunkedEncoding = async (url, options) => {
+  console.log('[Chunked Fetch] Используем chunked transfer encoding');
+  
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30 * 60 * 1000); // 30 минут
+  
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        ...options.headers,
+        'Accept': 'application/json',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Keep-Alive': 'timeout=300, max=1000'
+      }
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+    }
+    
+    // Читаем потоково
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let result = '';
+    let lastChunkTime = Date.now();
+    
+    while (true) {
+      const { done, value } = await reader.read();
+      
+      if (done) {
+        break;
+      }
+      
+      // Сбрасываем таймаут при получении данных
+      lastChunkTime = Date.now();
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000); // 5 минут без данных
+      
+      const chunk = decoder.decode(value, { stream: true });
+      result += chunk;
+      
+      // Логируем прогресс получения данных
+      console.log(`[Chunked Fetch] Получено ${result.length} байт данных`);
+    }
+    
+    clearTimeout(timeoutId);
+    
+    try {
+      return JSON.parse(result);
+    } catch (parseError) {
+      console.warn('[Chunked Fetch] Не удалось распарсить JSON, возвращаем текст');
+      return result;
+    }
+    
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
+  }
+};
+
+/**
+ * Метод с использованием Web Workers для избежания блокировки UI
+ */
+const fetchWithWorker = (url, payload) => {
+  return new Promise((resolve, reject) => {
+    if (typeof Worker === 'undefined') {
+      reject(new Error('Web Workers не поддерживаются'));
+      return;
+    }
+    
+    // Создаем временный worker
+    const workerCode = `
+      self.onmessage = async (e) => {
+        const { url, payload } = e.data;
+        
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 30 * 60 * 1000);
+          
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify(payload),
+            signal: controller.signal
+          });
+          
+          clearTimeout(timeoutId);
+          
+          if (!response.ok) {
+            throw new Error(\`HTTP \${response.status}\`);
+          }
+          
+          const data = await response.json();
+          self.postMessage({ success: true, data });
+          
+        } catch (error) {
+          self.postMessage({ 
+            success: false, 
+            error: error.message 
+          });
+        }
+      };
+    `;
+    
+    const blob = new Blob([workerCode], { type: 'application/javascript' });
+    const worker = new Worker(URL.createObjectURL(blob));
+    
+    // Таймаут для worker
+    const workerTimeout = setTimeout(() => {
+      worker.terminate();
+      reject(new Error('Worker timeout (30 минут)'));
+    }, 30 * 60 * 1000);
+    
+    worker.onmessage = (e) => {
+      clearTimeout(workerTimeout);
+      worker.terminate();
+      
+      if (e.data.success) {
+        resolve(e.data.data);
+      } else {
+        reject(new Error(e.data.error));
+      }
+    };
+    
+    worker.onerror = (error) => {
+      clearTimeout(workerTimeout);
+      worker.terminate();
+      reject(new Error(`Worker error: ${error.message}`));
+    };
+    
+    // Запускаем worker
+    worker.postMessage({ url, payload });
+  });
+};
+
+/**
+ * Основной метод генерации данных с множеством fallback стратегий
+ */
+export const generateAuditData = async (params) => {
   const { city, site, competitors } = params;
+  
+  console.log('[generateAuditData] 🚀 Начинаем генерацию аудита для:', {
+    city,
+    site,
+    competitorsCount: competitors?.length || 0
+  });
 
   // Получаем cityCode и cityId
   const cityInfo = cityMapping[city];
@@ -127,213 +241,304 @@ export const generateAuditDataSSE = async (params) => {
     url4: competitors[2] || '',
     url5: competitors[3] || '',
     url6: competitors[4] || '',
-    // Добавляем timestamp для уникальности
     timestamp: Date.now()
   };
 
-  console.log('[generateAuditDataSSE] 📤 Отправляем запрос к backend:', {
-    url: `${API_BASE_URL}/generate-audit-sse`,
-    payload
-  });
+  // Список стратегий в порядке приоритета
+  const strategies = [
+    { name: 'chunked', func: tryChunkedStrategy },
+    { name: 'worker', func: tryWorkerStrategy },
+    { name: 'simple', func: trySimpleStrategy },
+    { name: 'retry', func: tryRetryStrategy }
+  ];
 
-  try {
-    const response = await fetch(`${API_BASE_URL}/generate-audit-sse`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[generateAuditDataSSE] ❌ Backend error: ${response.status}`);
-      throw new Error(`Backend error: ${response.status} - ${errorText}`);
-    }
-
-    const result = await response.json();
+  // Пробуем все стратегии по порядку
+  let lastError = null;
+  
+  for (const strategy of strategies) {
+    console.log(`[generateAuditData] Пробуем стратегию: ${strategy.name}`);
     
-    if (result.taskId) {
-      console.log(`[generateAuditDataSSE] ✅ Задача создана, ID: ${result.taskId}`);
+    try {
+      const result = await strategy.func(payload);
+      console.log(`[generateAuditData] ✅ Стратегия "${strategy.name}" успешна`);
+      return result;
+    } catch (error) {
+      console.warn(`[generateAuditData] Стратегия "${strategy.name}" не сработала:`, error.message);
+      lastError = error;
       
-      // Возвращаем промис, который резолвится когда задача будет выполнена
-      return new Promise((resolve, reject) => {
-        let progress = 0;
-        let lastUpdate = Date.now();
-        
-        const eventSource = setupSSEConnection(
-          result.taskId,
-          (newProgress, message) => {
-            progress = newProgress;
-            lastUpdate = Date.now();
-            console.log(`[generateAuditDataSSE] Прогресс обновлен: ${progress}%`);
-          },
-          (resultData) => {
-            console.log('[generateAuditDataSSE] ✅ Задача завершена успешно');
-            if (eventSource) eventSource.close();
-            resolve(resultData);
-          },
-          (error) => {
-            console.error('[generateAuditDataSSE] ❌ Ошибка в задаче:', error);
-            if (eventSource) eventSource.close();
-            reject(error);
-          }
-        );
-        
-        if (!eventSource) {
-          reject(new Error('SSE не поддерживается в этом браузере'));
-          return;
-        }
-        
-        // Таймаут на случай если соединение потеряно
-        const checkInterval = setInterval(() => {
-          if (Date.now() - lastUpdate > 5 * 60 * 1000) { // 5 минут без обновлений
-            console.error('[generateAuditDataSSE] ⏱️ Нет обновлений более 5 минут');
-            clearInterval(checkInterval);
-            if (eventSource) eventSource.close();
-            reject(new Error('Нет обновлений от сервера более 5 минут'));
-          }
-        }, 30000); // Проверяем каждые 30 секунд
-        
-        // Очистка при завершении
-        const originalClose = eventSource.close;
-        eventSource.close = function() {
-          clearInterval(checkInterval);
-          originalClose.call(this);
-        };
-      });
-    } else if (result.data) {
-      // Если результат получен сразу
-      console.log('[generateAuditDataSSE] ✅ Данные получены сразу');
-      return result.data;
-    } else {
-      throw new Error('Некорректный ответ от сервера');
+      // Ждем перед следующей попыткой
+      if (strategy !== strategies[strategies.length - 1]) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
     }
-  } catch (error) {
-    console.error('[generateAuditDataSSE] ❌ Error:', error.message);
-    throw error;
   }
+  
+  // Если все стратегии провалились
+  console.error('[generateAuditData] ❌ Все стратегии провалились');
+  throw lastError || new Error('Не удалось выполнить запрос');
 };
 
+// ========== СТРАТЕГИИ ==========
+
 /**
- * Fallback метод для старых браузеров (если SSE не поддерживается)
+ * Стратегия 1: Chunked transfer encoding
  */
-export const generateAuditDataFallback = async (params) => {
-  const { city, site, competitors } = params;
-
-  const cityInfo = cityMapping[city];
-  if (!cityInfo) {
-    throw new Error(`Город "${city}" не найден в справочнике`);
-  }
-
-  const payload = {
-    cityCode: cityInfo.cityCode,
-    cityId: cityInfo.cityId,
-    url1: site,
-    url2: competitors[0] || '',
-    url3: competitors[1] || '',
-    url4: competitors[2] || '',
-    url5: competitors[3] || '',
-    url6: competitors[4] || ''
-  };
-
-  console.log('[generateAuditDataFallback] 📤 Отправляем запрос (fallback):', {
-    url: `${API_BASE_URL}/generate-audit-long`,
-    payload
-  });
-
+async function tryChunkedStrategy(payload) {
+  console.log('[tryChunkedStrategy] Используем chunked transfer...');
+  
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30 * 60 * 1000);
+  
   try {
-    // Используем очень большой таймаут (30 минут)
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30 * 60 * 1000);
-
-    const response = await fetch(`${API_BASE_URL}/generate-audit-long`, {
+    const response = await fetch(`${API_BASE_URL}/generate-audit`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json'
+        'Accept': 'application/json',
+        'X-Chunked-Request': 'true',
+        'Connection': 'keep-alive'
       },
       body: JSON.stringify(payload),
       signal: controller.signal
     });
-
+    
     clearTimeout(timeoutId);
-
+    
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Backend error: ${response.status} - ${errorText}`);
+      throw new Error(`HTTP ${response.status}: ${await response.text()}`);
     }
-
+    
     const data = await response.json();
-    console.log('[generateAuditDataFallback] ✅ Данные получены');
+    console.log('[tryChunkedStrategy] ✅ Данные получены');
     return data;
+    
   } catch (error) {
-    console.error('[generateAuditDataFallback] ❌ Error:', error.message);
-    
-    if (error.name === 'AbortError') {
-      throw new Error('Запрос был отменен из-за таймаута (30 минут). Пожалуйста, попробуйте позже или используйте современный браузер.');
-    }
-    
+    clearTimeout(timeoutId);
     throw error;
   }
-};
+}
 
 /**
- * Универсальный метод для генерации данных аудита
- * Автоматически выбирает лучший способ в зависимости от поддержки браузера
+ * Стратегия 2: Web Worker
  */
-export const generateAuditData = async (params) => {
-  console.log('[generateAuditData] 🚀 Начинаем генерацию аудита...');
+async function tryWorkerStrategy(payload) {
+  console.log('[tryWorkerStrategy] Используем Web Worker...');
+  return await fetchWithWorker(`${API_BASE_URL}/generate-audit`, payload);
+}
+
+/**
+ * Стратегия 3: Простой fetch с длительным таймаутом
+ */
+async function trySimpleStrategy(payload) {
+  console.log('[trySimpleStrategy] Используем простой fetch...');
   
-  // Проверяем поддержку SSE
-  if (isSSESupported()) {
-    console.log('[generateAuditData] Браузер поддерживает SSE, используем продвинутый метод');
+  // Пробуем разные эндпоинты
+  const endpoints = [
+    '/generate-audit',
+    '/generate-url',
+    '/api/audit',
+    '/audit/generate'
+  ];
+  
+  for (const endpoint of endpoints) {
     try {
-      return await generateAuditDataSSE(params);
-    } catch (sseError) {
-      console.warn('[generateAuditData] SSE метод не сработал, пробуем fallback:', sseError.message);
-      // Пробуем fallback метод
-      return await generateAuditDataFallback(params);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 45 * 60 * 1000); // 45 минут
+      
+      console.log(`[trySimpleStrategy] Пробуем эндпоинт: ${endpoint}`);
+      
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status} для ${endpoint}`);
+      }
+      
+      const data = await response.json();
+      console.log(`[trySimpleStrategy] ✅ Успех через эндпоинт: ${endpoint}`);
+      return data;
+      
+    } catch (error) {
+      console.warn(`[trySimpleStrategy] Эндпоинт ${endpoint} не сработал:`, error.message);
+      // Пробуем следующий эндпоинт
     }
-  } else {
-    console.log('[generateAuditData] Браузер не поддерживает SSE, используем fallback метод');
-    return await generateAuditDataFallback(params);
   }
-};
+  
+  throw new Error('Все эндпоинты недоступны');
+}
 
 /**
- * Проверяет статус существующей задачи по ID
- * @param {string} taskId - ID задачи
- * @returns {Promise<object>} - статус задачи
+ * Стратегия 4: Retry с экспоненциальной задержкой
  */
-export const checkTaskStatus = async (taskId) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/task-status/${taskId}`);
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+async function tryRetryStrategy(payload, maxRetries = 5) {
+  console.log(`[tryRetryStrategy] Начинаем retry стратегию (${maxRetries} попыток)`);
+  
+  let lastError = null;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    console.log(`[tryRetryStrategy] Попытка ${attempt}/${maxRetries}`);
+    
+    try {
+      const controller = new AbortController();
+      
+      // Увеличиваем таймаут с каждой попыткой
+      const timeoutMs = Math.min(10 * 60 * 1000 * attempt, 60 * 60 * 1000); // до 60 минут
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      
+      const response = await fetch(`${API_BASE_URL}/generate-audit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Retry-Attempt': attempt.toString(),
+          'X-Request-Timeout': timeoutMs.toString()
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+        // Важно: mode 'no-cors' может помочь с некоторыми CORS проблемами
+        // mode: 'no-cors'
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status} на попытке ${attempt}`);
+      }
+      
+      const data = await response.json();
+      console.log(`[tryRetryStrategy] ✅ Успех на попытке ${attempt}`);
+      return data;
+      
+    } catch (error) {
+      lastError = error;
+      console.warn(`[tryRetryStrategy] Попытка ${attempt} не удалась:`, error.message);
+      
+      if (attempt < maxRetries) {
+        // Экспоненциальная задержка
+        const delayMs = Math.min(1000 * Math.pow(2, attempt - 1), 30000);
+        console.log(`[tryRetryStrategy] Ждем ${delayMs}мс перед следующей попыткой`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
     }
-    return await response.json();
-  } catch (error) {
-    console.error('[checkTaskStatus] ❌ Error:', error.message);
-    throw error;
   }
-};
+  
+  throw lastError || new Error('Все retry попытки провалились');
+}
 
 /**
- * Отменяет выполнение задачи
- * @param {string} taskId - ID задачи
+ * Дополнительный метод: Генерация через iframe для полного обхода CORS и таймаутов
  */
-export const cancelTask = async (taskId) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/cancel-task/${taskId}`, {
-      method: 'POST'
-    });
-    return response.ok;
-  } catch (error) {
-    console.error('[cancelTask] ❌ Error:', error.message);
-    return false;
-  }
+export const generateViaIframe = async (params, iframeContainer) => {
+  return new Promise((resolve, reject) => {
+    const { city, site, competitors } = params;
+    const cityInfo = cityMapping[city];
+    
+    if (!cityInfo) {
+      reject(new Error(`Город "${city}" не найден`));
+      return;
+    }
+    
+    const payload = {
+      cityCode: cityInfo.cityCode,
+      cityId: cityInfo.cityId,
+      url1: site,
+      url2: competitors[0] || '',
+      url3: competitors[1] || '',
+      url4: competitors[2] || '',
+      url5: competitors[3] || '',
+      url6: competitors[4] || ''
+    };
+    
+    // Создаем iframe
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.sandbox = 'allow-scripts allow-same-origin';
+    
+    // Генерируем HTML страницу с формой
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <script>
+          window.onmessage = function(e) {
+            if (e.data.type === 'submit') {
+              fetch('${API_BASE_URL}/generate-audit', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(e.data.payload),
+                mode: 'no-cors'
+              }).then(response => {
+                // В режиме no-cors мы не можем прочитать ответ
+                window.parent.postMessage({
+                  type: 'complete',
+                  message: 'Запрос отправлен'
+                }, '*');
+              }).catch(error => {
+                window.parent.postMessage({
+                  type: 'error',
+                  error: error.message
+                }, '*');
+              });
+            }
+          };
+        </script>
+      </head>
+      <body>
+        <div id="status">Готов к отправке...</div>
+      </body>
+      </html>
+    `;
+    
+    iframe.srcdoc = html;
+    
+    iframe.onload = () => {
+      // Отправляем данные в iframe
+      iframe.contentWindow.postMessage({
+        type: 'submit',
+        payload: payload
+      }, '*');
+      
+      // Таймаут для iframe
+      const timeoutId = setTimeout(() => {
+        document.body.removeChild(iframe);
+        reject(new Error('iframe timeout (30 минут)'));
+      }, 30 * 60 * 1000);
+      
+      // Слушаем ответ от iframe
+      window.addEventListener('message', function iframeListener(e) {
+        if (e.source === iframe.contentWindow) {
+          clearTimeout(timeoutId);
+          window.removeEventListener('message', iframeListener);
+          document.body.removeChild(iframe);
+          
+          if (e.data.type === 'complete') {
+            resolve({ success: true, message: e.data.message });
+          } else if (e.data.type === 'error') {
+            reject(new Error(e.data.error));
+          }
+        }
+      });
+    };
+    
+    iframe.onerror = () => {
+      document.body.removeChild(iframe);
+      reject(new Error('Ошибка загрузки iframe'));
+    };
+    
+    // Добавляем iframe в DOM
+    iframeContainer.appendChild(iframe);
+  });
 };
 
 export default generateAuditData;

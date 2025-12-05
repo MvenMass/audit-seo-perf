@@ -25,49 +25,81 @@ const UrlGenerator = () => {
   const navigate = useNavigate();
   const [city, setCity] = useState("");
   const [site, setSite] = useState("");
-  const [competitors, setCompetitors] = useState(""); // Одно текстовое поле!
+  const [competitors, setCompetitors] = useState(["", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  const handleCompetitorChange = (index, value) => {
+    const newCompetitors = [...competitors];
+    newCompetitors[index] = value;
+    setCompetitors(newCompetitors);
+  };
+
   const handleGenerate = async () => {
+    // Проверяем обязательные поля
     if (!city.trim() || !site.trim()) {
-      setError("❌ Заполните город и ваш сайт");
+      setError("❌ Пожалуйста, заполните поля 'Ваш город' и 'Ваш сайт'");
       return;
     }
 
+    // Очищаем предыдущие ошибки
     setError(null);
+
+    const formData = {
+      city,
+      site,
+      competitors: competitors.filter(comp => comp.trim() !== "")
+    };
+
     setLoading(true);
 
     try {
-      // Парсим конкурентов: разделяем по переносам, пробелам или запятым
-      const competitorsList = competitors
-        .split(/[\n,\s]+/)
-        .map(url => url.trim())
-        .filter(url => url && url !== site.trim())
-        .slice(0, 5); // Макс 5 конкурентов
-
-      const formData = {
-        city,
-        site: site.trim(),
-        competitors: competitorsList
-      };
-
+      console.log('[UrlGenerator] 📤 Начинаем анализ...');
+      
+      // Пытаемся получить данные от backend
       const auditData = await generateAuditData(formData);
 
+      console.log('[UrlGenerator] ✅ Данные получены, переходим на страницу результатов');
+      
+      // Если успешно, передаем оба набора данных
       navigate('/audit-results', {
-        state: { formData, auditData }
+        state: {
+          formData,
+          auditData // Данные от backend
+        }
       });
     } catch (err) {
-      console.error('[UrlGenerator] Error:', err);
-      
-      const errorMessages = {
-        'timeout': '⏱️ Анализ занял слишком долго',
-        'город': '❌ ' + err.message,
-        'default': '❌ Ошибка при анализе: ' + err.message
-      };
+      console.error('[UrlGenerator] ❌ Error:', err.message);
 
-      const errorMsg = Object.keys(errorMessages).find(key => err.message.includes(key));
-      setError(errorMessages[errorMsg] || errorMessages.default);
+      // Определяем тип ошибки и показываем соответствующее сообщение
+      let errorMessage = "❌ Ошибка при анализе сайта";
+
+      if (err.message.includes('timeout')) {
+        errorMessage = "⏱️ Анализ занял слишком долго (более 5 минут). Пожалуйста, попробуйте позже.";
+      } else if (err.message.includes('Network error') || err.message.includes('Failed to fetch')) {
+        errorMessage = "🌐 Не удается подключиться к серверу. Проверьте интернет-соединение и убедитесь, что сервер запущен.";
+      } else if (err.message.includes('Backend error')) {
+        errorMessage = `⚠️ Ошибка сервера: ${err.message}`;
+      } else if (err.message.includes('не найден в справочнике')) {
+        errorMessage = `❌ ${err.message}`;
+      } else {
+        errorMessage = `❌ ${err.message}`;
+      }
+
+      setError(errorMessage);
+
+      // Опционально: все равно показать результаты с fallback данными
+      // Раскомментируй эту часть, если хочешь показывать результаты даже при ошибке
+      /*
+      console.warn('[UrlGenerator] 📊 Backend недоступен, используем fallback данные');
+      navigate('/audit-results', {
+        state: {
+          formData,
+          // auditData не передаем - будет использован fallback из auditData.json
+          errorMessage: 'Анализ данных выполнен с использованием кэша (backend недоступен)'
+        }
+      });
+      */
     } finally {
       setLoading(false);
     }
@@ -76,18 +108,8 @@ const UrlGenerator = () => {
   const handleClear = () => {
     setCity("");
     setSite("");
-    setCompetitors("");
+    setCompetitors(["", "", "", "", ""]);
     setError(null);
-  };
-
-  const handlePaste = (e) => {
-    const paste = e.clipboardData.getData('text');
-    
-    // Если в буфере обмена несколько URL — добавляем их все
-    if (paste.includes('\n') || paste.includes(',')) {
-      setCompetitors(prev => (prev ? prev + '\n' : '') + paste);
-      e.preventDefault();
-    }
   };
 
   return (
@@ -96,7 +118,12 @@ const UrlGenerator = () => {
         <span>Аудит сайта</span> от Seo Performance
       </div>
 
-      {error && <div className="url-generator-error">{error}</div>}
+      {/* Показываем ошибку, если она есть */}
+      {error && (
+        <div className="url-generator-error">
+          {error}
+        </div>
+      )}
 
       <div className="url-generator-block">
         <label className="url-generator-label">Ваш город:</label>
@@ -105,12 +132,16 @@ const UrlGenerator = () => {
           value={city}
           onChange={e => {
             setCity(e.target.value);
-            setError(null);
+            setError(null); // Очищаем ошибку при изменении поля
           }}
           disabled={loading}
         >
           <option value="">Выберите город</option>
-          {BASE_CITIES.map(c => <option key={c} value={c}>{c}</option>)}
+          {BASE_CITIES.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
         </select>
       </div>
 
@@ -119,35 +150,34 @@ const UrlGenerator = () => {
         <input
           type="text"
           value={site}
-          onChange={e => {
+          onChange={(e) => {
             setSite(e.target.value);
-            setError(null);
+            setError(null); // Очищаем ошибку при изменении поля
           }}
-          placeholder="example.com"
+          placeholder="Введите сайт (например: example.com)"
           className="url-generator-input"
           disabled={loading}
         />
       </div>
 
-      <div className="url-generator-block">
-        <label className="url-generator-label">
-          Сайты конкурентов:
-        </label>
-        <textarea
-          value={competitors}
-          onChange={e => {
-            setCompetitors(e.target.value);
-            setError(null);
-          }}
-          onPaste={handlePaste}
-          placeholder={`Вставьте URL конкурентов по одному на строку\nПримеры:\ncompetitor1.com\ncompetitor2.com\ncompetitor3.com`}
-          className="url-generator-input url-generator-textarea"
-          rows={5}
-          disabled={loading}
-        />
-        <small style={{ color: '#999', marginTop: '8px', display: 'block' }}>
-          Введено: {competitors.split(/[\n,\s]+/).filter(u => u.trim()).length} URL
-        </small>
+      <div className="url-generator-block url-generator-block__container">
+        <label className="url-generator-label">Укажите сайты конкурентов (опционально):</label>
+        <div className="url-generator-block__conc">
+          {competitors.map((comp, index) => (
+            <input
+              key={index}
+              type="text"
+              value={comp}
+              onChange={(e) => {
+                handleCompetitorChange(index, e.target.value);
+                setError(null); // Очищаем ошибку при изменении поля
+              }}
+              placeholder={`Сайт конкурента ${index + 1}`}
+              className="url-generator-input url-generator-input-conc"
+              disabled={loading}
+            />
+          ))}
+        </div>
       </div>
 
       <div className="url-generator-buttons">
@@ -156,20 +186,22 @@ const UrlGenerator = () => {
           onClick={handleGenerate}
           disabled={loading}
         >
-          {loading ? '⏳ Анализирование...' : '🔍 Начать анализ'}
+          {loading ? '⏳ Анализирование... (может занять до 5 минут)' : '🔍 Начать анализ'}
         </button>
         <button
           className="url-generator-clear"
           onClick={handleClear}
           disabled={loading}
         >
-          🗑️ Очистить
+          🗑️ Очистить данные
         </button>
       </div>
 
+      {/* Информация о процессе загрузки */}
       {loading && (
         <div className="url-generator-info">
-          <p>⏳ Анализ может занять 1-5 минут...</p>
+          <p>⏳ Пожалуйста, подождите...</p>
+          <p>Анализ может занять от 1 до 5 минут в зависимости от нагрузки на сервер.</p>
         </div>
       )}
     </div>

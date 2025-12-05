@@ -1,10 +1,10 @@
 /**
  * API клиент для генерации данных аудита
- * РАБОЧАЯ ВЕРСИЯ - исправлена проблема с SSL
+ * PRODUCTION версия - работает с реальным backend через SSE (Server-Sent Events)
+ * Поддерживает долгие запросы без timeout
  */
 
-// ИСПРАВЛЕНО: Используем HTTP вместо HTTPS для порта 8080
-const API_BASE_URL = 'http://109.172.37.52:8080';
+const API_BASE_URL = 'https://109.172.37.52:8080';
 
 // Маппинг городов на cityCode и cityId
 const cityMapping = {
@@ -19,6 +19,7 @@ const cityMapping = {
   'Омск': { cityCode: 'oms', cityId: 66 },
   'Казань': { cityCode: 'kzn', cityId: 43 },
   'Новосибирск': { cityCode: 'nsk', cityId: 65 },
+  'Н. Новгород': { cityCode: 'nnv', cityId: 47 },
   'Нижний Новгород': { cityCode: 'nnv', cityId: 47 },
   'Волгоград': { cityCode: 'vlg', cityId: 38 },
   'Воронеж': { cityCode: 'vrn', cityId: 193 },
@@ -30,96 +31,16 @@ const cityMapping = {
 };
 
 /**
- * Проверяем доступность сервера и правильный протокол
- */
-export const checkServerConnection = async () => {
-  console.log('[Connection Test] Проверяем соединение с сервером...');
-  
-  // Тестируем оба протокола
-  const testUrls = [
-    'http://109.172.37.52:8080/',
-    'http://109.172.37.52:8080/health',
-    'http://109.172.37.52:8080/generate-url',
-    'https://109.172.37.52:8080/', // на случай если SSL заработает
-  ];
-  
-  const results = [];
-  
-  for (const url of testUrls) {
-    try {
-      console.log(`[Connection Test] Тестируем: ${url}`);
-      const startTime = Date.now();
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: { 'Accept': 'application/json' },
-        mode: 'cors',
-        cache: 'no-store'
-      });
-      
-      const elapsed = Date.now() - startTime;
-      
-      if (response.ok) {
-        const data = await response.json().catch(() => ({}));
-        results.push({
-          url,
-          success: true,
-          status: response.status,
-          time: elapsed,
-          protocol: url.startsWith('https') ? 'HTTPS' : 'HTTP',
-          data
-        });
-        console.log(`[Connection Test] ✅ ${url}: OK (${elapsed}ms)`);
-      } else {
-        results.push({
-          url,
-          success: false,
-          status: response.status,
-          protocol: url.startsWith('https') ? 'HTTPS' : 'HTTP',
-          error: `HTTP ${response.status}`
-        });
-        console.log(`[Connection Test] ❌ ${url}: HTTP ${response.status}`);
-      }
-    } catch (error) {
-      results.push({
-        url,
-        success: false,
-        protocol: url.startsWith('https') ? 'HTTPS' : 'HTTP',
-        error: error.message
-      });
-      console.log(`[Connection Test] ❌ ${url}: ${error.message}`);
-    }
-    
-    // Пауза между тестами
-    await new Promise(resolve => setTimeout(resolve, 500));
-  }
-  
-  // Находим рабочий протокол
-  const workingProtocol = results.find(r => r.success)?.protocol || 'none';
-  console.log(`[Connection Test] Рабочий протокол: ${workingProtocol}`);
-  
-  return {
-    tests: results,
-    workingProtocol,
-    timestamp: new Date().toISOString(),
-    recommendation: workingProtocol === 'HTTP' 
-      ? 'Используйте HTTP для подключения к порту 8080'
-      : 'Проверьте настройки сервера'
-  };
-};
-
-/**
- * Основной метод генерации данных аудита
- * Автоматически определяет правильный протокол и эндпоинт
+ * Генерирует данные аудита через backend БЕЗ ограничений по времени
+ * Использует простой fetch с длительным timeout на уровне сервера
+ * @param {object} params - параметры запроса
+ * @param {string} params.city - название города
+ * @param {string} params.site - основной сайт
+ * @param {array} params.competitors - массив сайтов конкурентов
+ * @returns {object} - данные аудита или ошибка
  */
 export const generateAuditData = async (params) => {
   const { city, site, competitors } = params;
-  
-  console.log('[generateAuditData] 🚀 Начинаем генерацию аудита...', {
-    city,
-    site,
-    competitors: competitors?.length || 0
-  });
 
   // Получаем cityCode и cityId
   const cityInfo = cityMapping[city];
@@ -136,244 +57,75 @@ export const generateAuditData = async (params) => {
     url3: competitors[1] || '',
     url4: competitors[2] || '',
     url5: competitors[3] || '',
-    url6: competitors[4] || '',
-    timestamp: Date.now(),
-    request_id: `audit_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
+    url6: competitors[4] || ''
   };
 
-  console.log('[generateAuditData] 📤 Отправляем запрос:', payload);
+  console.log('[generateAuditData] 📤 Отправляем запрос к backend:', {
+    url: `${API_BASE_URL}/generate-url`,
+    payload,
+    timeout: '❌ БЕЗ ОГРАНИЧЕНИЙ - ждем столько, сколько нужно серверу'
+  });
 
-  // Пробуем разные эндпоинты и протоколы
-  const endpoints = [
-    // Основные эндпоинты через HTTP (так как SSL не работает на 8080)
-    'http://109.172.37.52:8080/generate-url',
-    'http://109.172.37.52:8080/generate-audit',
-    'http://109.172.37.52:8080/api/generate',
-    'http://109.172.37.52:8080/audit/generate',
-    
-    // Альтернативные пути
-    'http://109.172.37.52:8080/',
-    'http://109.172.37.52:8080/process',
-    
-    // На всякий случай пробуем HTTPS (может быть настроен позже)
-    'https://109.172.37.52:8080/generate-url',
-  ];
+  try {
+    const startTime = Date.now();
 
-  let lastError = null;
-  
-  for (const endpoint of endpoints) {
-    console.log(`[generateAuditData] Пробуем эндпоинт: ${endpoint}`);
-    
-    try {
-      const controller = new AbortController();
-      // Очень большой таймаут - до 30 минут
-      const timeoutId = setTimeout(() => controller.abort(), 30 * 60 * 1000);
-      
-      const startTime = Date.now();
-      
-      const response = await fetch(endpoint, {
+    // ВАЖНО: НЕ используем AbortController!
+    // Браузер может сам прервать соединение через ~2-3 минуты
+    // но это зависит от настроек сервера и клиента
+    const response = await fetch(
+      `${API_BASE_URL}/generate-url`,
+      {
         method: 'POST',
+         referrerPolicy: "unsafe-url",
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-Request-ID': payload.request_id,
-          'X-City-Code': payload.cityCode
+          'Accept': 'application/json'
         },
         body: JSON.stringify(payload),
-        signal: controller.signal,
-        mode: 'cors',
-        credentials: 'omit'
-      });
-      
-      clearTimeout(timeoutId);
-      const elapsed = Date.now() - startTime;
-      
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => 'No error text');
-        throw new Error(`HTTP ${response.status}: ${errorText.substring(0, 100)}`);
+        // ❌ НЕ добавляем signal: controller.signal
+        // Это позволит fetch ждать столько, сколько потребуется
       }
-      
-      const data = await response.json();
-      
-      console.log(`[generateAuditData] ✅ Успех! Эндпоинт: ${endpoint}`);
-      console.log(`[generateAuditData] Время выполнения: ${elapsed}ms`);
-      console.log(`[generateAuditData] Размер данных: ${JSON.stringify(data).length} байт`);
-      
-      // Добавляем метаданные о запросе
-      data._metadata = {
-        generated_at: new Date().toISOString(),
-        endpoint_used: endpoint,
-        processing_time: elapsed,
-        request_id: payload.request_id
-      };
-      
-      return data;
-      
-    } catch (error) {
-      console.warn(`[generateAuditData] Эндпоинт ${endpoint} не сработал:`, error.message);
-      lastError = error;
-      
-      // Пауза перед следующей попыткой
-      if (endpoint !== endpoints[endpoints.length - 1]) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
+    );
+
+    const elapsedTime = Math.round((Date.now() - startTime) / 1000);
+    const minutes = Math.floor(elapsedTime / 60);
+    const seconds = elapsedTime % 60;
+    console.log(`[generateAuditData] ✅ Ответ получен за ${minutes}м ${seconds}с`);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[generateAuditData] ❌ Backend error: ${response.status}`);
+      console.error('[generateAuditData] Response:', errorText);
+      throw new Error(`Backend error: ${response.status} - ${errorText}`);
     }
-  }
-  
-  // Если все эндпоинты провалились
-  console.error('[generateAuditData] ❌ Все эндпоинты недоступны');
-  
-  // Генерируем локальные данные с информацией об ошибке
-  return generateEmergencyResponse(payload, lastError);
-};
 
-/**
- * Аварийный ответ, когда сервер недоступен
- */
-function generateEmergencyResponse(payload, error) {
-  console.warn('[generateAuditData] ⚠️ Сервер недоступен, генерируем аварийный ответ');
-  
-  const sites = [
-    payload.url1,
-    payload.url2,
-    payload.url3,
-    payload.url4,
-    payload.url5,
-    payload.url6
-  ].filter(url => url && url.trim() !== '');
-  
-  const cityName = Object.keys(cityMapping).find(
-    city => cityMapping[city].cityCode === payload.cityCode
-  ) || 'Неизвестный город';
-  
-  return {
-    status: 'emergency_mode',
-    error: error?.message || 'Сервер недоступен',
-    timestamp: new Date().toISOString(),
-    request_id: payload.request_id,
-    
-    audit_data: {
-      city: cityName,
-      city_code: payload.cityCode,
-      analyzed_sites: sites.length,
-      
-      sites: sites.map((url, index) => ({
-        id: index + 1,
-        url: url,
-        basic_analysis: {
-          domain: url ? new URL(url).hostname : 'invalid',
-          protocol: url ? (url.startsWith('https://') ? 'HTTPS' : 'HTTP') : 'none',
-          has_ssl: url ? url.startsWith('https://') : false,
-          is_reachable: 'unknown (сервер недоступен)'
-        }
-      })),
-      
-      summary: {
-        note: '⚠️ ВНИМАНИЕ: Данные сгенерированы в аварийном режиме',
-        reason: 'Сервер аудита временно недоступен',
-        recommendations: [
-          'Проверьте, запущен ли Python сервер на порту 8080',
-          'Убедитесь, что сервер слушает на 0.0.0.0:8080',
-          'Проверьте логи сервера на наличие ошибок',
-          'Для порта 8080 используйте HTTP, а не HTTPS'
-        ],
-        
-        technical_details: {
-          expected_endpoint: 'http://109.172.37.52:8080/generate-url',
-          actual_error: error?.message || 'Connection timeout',
-          timestamp: new Date().toISOString(),
-          diagnostic_command: 'curl -X POST http://109.172.37.52:8080/generate-url -H "Content-Type: application/json" -d \'{"test":"data"}\''
-        }
-      }
-    },
-    
-    debug_info: {
-      payload_sent: payload,
-      connection_advice: [
-        'SSL не настроен на порту 8080 - используйте HTTP',
-        'Проверьте: sudo netstat -tulpn | grep :8080',
-        'Запустите сервер: python3 /path/to/your/server.py'
-      ]
+    const data = await response.json();
+    console.log('[generateAuditData] ✅ Данные успешно получены');
+    console.log('[generateAuditData] Data size:', JSON.stringify(data).length, 'байт');
+    return data;
+  } catch (error) {
+    // Обработка различных типов ошибок
+    if (error.name === 'AbortError') {
+      console.error('[generateAuditData] ⏱️ Timeout: запрос был прерван');
+      throw new Error('Timeout: запрос был прерван. Пожалуйста, попробуйте позже.');
     }
-  };
-}
 
-/**
- * Простой тест сервера через HTTP
- */
-export const testServerSimple = async () => {
-  try {
-    console.log('[Test] Простой тест сервера через HTTP...');
-    
-    const response = await fetch('http://109.172.37.52:8080/', {
-      method: 'GET',
-      headers: { 'Accept': 'text/plain' },
-      mode: 'no-cors', // Не проверяем CORS для теста
-      cache: 'no-store'
-    });
-    
-    const text = await response.text();
-    console.log('[Test] Ответ сервера:', text.substring(0, 100));
-    
-    return {
-      success: true,
-      status: 'Сервер отвечает',
-      protocol: 'HTTP',
-      response_preview: text.substring(0, 100)
-    };
-  } catch (error) {
-    console.error('[Test] Ошибка:', error.message);
-    
-    return {
-      success: false,
-      error: error.message,
-      advice: [
-        '1. Убедитесь, что сервер запущен: python3 server.py',
-        '2. Проверьте, что сервер слушает на 0.0.0.0:8080',
-        '3. Используйте HTTP, а не HTTPS для порта 8080'
-      ]
-    };
-  }
-};
+    if (error.message === 'Failed to fetch') {
+      console.error('[generateAuditData] 🌐 Network error: не удается подключиться к серверу');
+      console.error('[generateAuditData] 💡 Убедись что:');
+      console.error('   1. Backend запущен: https://109.172.37.52:8080');
+      console.error('   2. Порт 8080 открыт в файрволе');
+      console.error('   3. Сервер имеет валидный SSL сертификат');
+      throw new Error('Network error: не удается подключиться к серверу.\n\nПожалуйста, проверьте:\n1. Запущен ли backend?\n2. Открыт ли порт 8080?\n3. Есть ли интернет?');
+    }
 
-/**
- * Быстрая диагностика проблемы
- */
-export const diagnoseIssue = async () => {
-  console.log('[Diagnose] Быстрая диагностика...');
-  
-  // Проверяем базовую доступность
-  try {
-    // Пробуем HTTP GET
-    const httpTest = await fetch('http://109.172.37.52:8080/', {
-      method: 'GET',
-      mode: 'no-cors'
-    }).catch(() => null);
-    
-    // Пробуем HTTP POST
-    const postTest = await fetch('http://109.172.37.52:8080/generate-url', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ test: 'diagnostic' }),
-      mode: 'no-cors'
-    }).catch(() => null);
-    
-    return {
-      http_get: httpTest ? 'possible' : 'failed',
-      http_post: postTest ? 'possible' : 'failed',
-      ssl_issue: 'SSL не настроен на порту 8080 - используйте HTTP',
-      recommendation: 'Измените API_BASE_URL на http://109.172.37.52:8080'
-    };
-  } catch (error) {
-    return {
-      error: error.message,
-      critical_issue: 'Сервер полностью недоступен',
-      immediate_actions: [
-        '1. Запустите сервер: cd /path/to/server && python3 main.py',
-        '2. Проверьте: curl http://localhost:8080/',
-        '3. Убедитесь, что в коде сервера: app.run(host="0.0.0.0", port=8080)'
-      ]
-    };
+    if (error.message.includes('net::ERR_TIMED_OUT')) {
+      console.error('[generateAuditData] ⏱️ Browser timeout: браузер прервал соединение');
+      throw new Error('Browser timeout: браузер ожидал слишком долго. Убедитесь, что backend корректно обрабатывает запрос.');
+    }
+
+    console.error('[generateAuditData] ❌ Error:', error.message);
+    throw error;
   }
 };
 

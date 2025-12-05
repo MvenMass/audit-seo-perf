@@ -131,7 +131,7 @@ const UrlGenerator = () => {
 
       <div className="url-generator-block">
         <label className="url-generator-label">
-          Сайты конкурентов (вставляйте через Ctrl+V, по одному на строку):
+          Сайты конкурентов:
         </label>
         <textarea
           value={competitors}

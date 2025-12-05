@@ -25,7 +25,7 @@ const UrlGenerator = () => {
   const navigate = useNavigate();
   const [city, setCity] = useState("");
   const [site, setSite] = useState("");
-  const [competitors, setCompetitors] = useState(["", "", "", "", ""]);
+  const [competitors, setCompetitors] = useState(["https://mosseo.ru/", "https://cinar.ru/", "https://stk-promo.com/", "https://www.gemius.ru/", "https://www.advertpro.ru/"]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -108,7 +108,7 @@ const UrlGenerator = () => {
   const handleClear = () => {
     setCity("");
     setSite("");
-    setCompetitors(["", "", "", "", ""]);
+    setCompetitors(["https://mosseo.ru/", "https://cinar.ru/", "https://stk-promo.com/", "https://www.gemius.ru/", "https://www.advertpro.ru/"]);
     setError(null);
   };
 

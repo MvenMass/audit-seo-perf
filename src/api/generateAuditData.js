@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://109.172.37.52:8080';
+const API_BASE_URL = 'http://109.172.37.52:8080/test';
 
 export const generateAuditData = async (params) => {
   const payload = buildPayload(params);
@@ -7,7 +7,7 @@ export const generateAuditData = async (params) => {
 
   try {
     // Шаг 1: Запустить анализ
-    const startResponse = await fetch(`${API_BASE_URL}/generate-url`, {
+    const startResponse = await fetch(`${API_BASE_URL}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)

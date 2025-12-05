@@ -4,7 +4,7 @@
  * Поддерживает долгие запросы без timeout
  */
 
-const API_BASE_URL = 'https://109.172.37.52:8080';
+const API_BASE_URL = 'http://109.172.37.52:8080';
 
 // Маппинг городов на cityCode и cityId
 const cityMapping = {

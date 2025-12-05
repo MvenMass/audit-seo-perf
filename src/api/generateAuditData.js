@@ -1,10 +1,10 @@
 /**
  * API клиент для генерации данных аудита
  * PRODUCTION версия - работает с реальным backend
+ * Ожидание ответа: НЕОГРАНИЧЕННОЕ (столько, сколько нужно серверу)
  */
 
 const API_BASE_URL = 'https://109.172.37.52:8080';
-const REQUEST_TIMEOUT = 120000; // 2 минуты
 
 // Маппинг городов на cityCode и cityId
 const cityMapping = {
@@ -31,19 +31,8 @@ const cityMapping = {
 };
 
 /**
- * Утилита для fetch с таймаутом
- */
-const fetchWithTimeout = (url, options = {}, timeout = REQUEST_TIMEOUT) => {
-  return Promise.race([
-    fetch(url, options),
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error(`Запрос истёк (${timeout / 1000}сек)`)), timeout)
-    )
-  ]);
-};
-
-/**
  * Генерирует данные аудита через backend
+ * Ожидает ответ столько, сколько нужно (без таймаута)
  * @param {object} params - параметры запроса
  * @param {string} params.city - название города
  * @param {string} params.site - основной сайт
@@ -73,13 +62,14 @@ export const generateAuditData = async (params) => {
   console.log('[generateAuditData] 📤 Отправляем запрос к backend:', {
     url: `${API_BASE_URL}/generate-url`,
     payload,
-    timeout: `${REQUEST_TIMEOUT / 1000}сек`
+    timeout: 'БЕЗ ОГРАНИЧЕНИЙ ⏱️'
   });
 
   try {
     const startTime = Date.now();
-    
-    const response = await fetchWithTimeout(
+
+    // Fetch БЕЗ таймаута - ждём столько, сколько нужно
+    const response = await fetch(
       `${API_BASE_URL}/generate-url`,
       {
         method: 'POST',
@@ -88,12 +78,11 @@ export const generateAuditData = async (params) => {
           'Accept': 'application/json'
         },
         body: JSON.stringify(payload)
-      },
-      REQUEST_TIMEOUT
+      }
     );
 
     const elapsedTime = Math.round((Date.now() - startTime) / 1000);
-    console.log(`[generateAuditData] ✅ Ответ получен за ${elapsedTime}сек`);
+    console.log(`[generateAuditData] ✅ Ответ получен за ${elapsedTime}сек (${Math.floor(elapsedTime / 60)}м ${elapsedTime % 60}с)`);
 
     if (!response.ok) {
       const errorText = await response.text();

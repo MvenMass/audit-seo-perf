@@ -40,7 +40,7 @@ function VisibilityChart({ visibility = {} }) {
         }
         const script = document.createElement('script');
         script.src = src;
-        script.async = true;
+       script.defer = false;
         script.onload = () => {
           loadedCount++;
           if (loadedCount === scripts.length) checkAndInit();

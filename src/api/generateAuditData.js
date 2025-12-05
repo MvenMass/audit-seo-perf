@@ -1,9 +1,12 @@
 /**
  * API клиент для генерации данных аудита
+ * PRODUCTION версия - работает с реальным backend
+ * Ожидание ответа: 5 МИНУТ (с возможностью прерывания)
  */
 
-const API_BASE_URL = 'http://109.172.37.52:8080';
+const API_BASE_URL = 'https://109.172.37.52:8080';
 
+// Маппинг городов на cityCode и cityId
 const cityMapping = {
   'Москва': { cityCode: 'msk', cityId: 213 },
   'Ростов-на-Дону': { cityCode: 'rnd', cityId: 39 },
@@ -27,59 +30,98 @@ const cityMapping = {
   'Тюмень': { cityCode: 'tum', cityId: 60 }
 };
 
+/**
+ * Генерирует данные аудита через backend
+ * Ожидает ответ до 5 минут (с AbortController)
+ * @param {object} params - параметры запроса
+ * @param {string} params.city - название города
+ * @param {string} params.site - основной сайт
+ * @param {array} params.competitors - массив сайтов конкурентов
+ * @returns {object} - данные аудита или ошибка
+ */
 export const generateAuditData = async (params) => {
   const { city, site, competitors } = params;
 
+  // Получаем cityCode и cityId
   const cityInfo = cityMapping[city];
   if (!cityInfo) {
-    throw new Error(`Город "${city}" не найден`);
+    throw new Error(`Город "${city}" не найден в справочнике`);
   }
 
-  // ВАЖНО: Нужно МИНИМУМ 5 сайтов!
-  const allSites = [site, ...(competitors || [])];
-  
-  if (allSites.length < 5) {
-    throw new Error(
-      `Нужно 5 сайтов! Основной: 1, Конкурентов: 4. ` +
-      `У тебя есть: ${allSites.length}`
-    );
-  }
-
+  // Подготавливаем данные для отправки
   const payload = {
     cityCode: cityInfo.cityCode,
     cityId: cityInfo.cityId,
-    url1: allSites[0],  // Твой сайт
-    url2: allSites[1],  // Конкурент 1
-    url3: allSites[2],  // Конкурент 2
-    url4: allSites[3],  // Конкурент 3
-    url5: allSites[4]   // Конкурент 4
+    url1: site,
+    url2: competitors[0] || '',
+    url3: competitors[1] || '',
+    url4: competitors[2] || '',
+    url5: competitors[3] || ''
   };
 
-  console.log('[generateAuditData] 📤 Запрос:', payload);
+  console.log('[generateAuditData] 📤 Отправляем запрос к backend:', {
+    url: `${API_BASE_URL}/generate-url`,
+    payload,
+    timeout: '5 минут ⏱️'
+  });
+
+  // Создаем AbortController для timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    console.warn('[generateAuditData] ⏱️ Timeout 5 минут достигнут, прерываем запрос');
+    controller.abort();
+  }, 5 * 60 * 1000); // 5 минут
 
   try {
+    const startTime = Date.now();
+
+    // Fetch с AbortController
     const response = await fetch(
       `${API_BASE_URL}/generate-url`,
       {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        signal: controller.signal // Добавляем signal для прерывания
       }
     );
 
+    clearTimeout(timeoutId);
+
+    const elapsedTime = Math.round((Date.now() - startTime) / 1000);
+    const minutes = Math.floor(elapsedTime / 60);
+    const seconds = elapsedTime % 60;
+    console.log(`[generateAuditData] ✅ Ответ получен за ${minutes}м ${seconds}с`);
+
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Backend ошибка: ${response.status} - ${error}`);
+      const errorText = await response.text();
+      console.error(`[generateAuditData] ❌ Backend error: ${response.status}`);
+      console.error('[generateAuditData] Response:', errorText);
+      throw new Error(`Backend error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
-    console.log('[generateAuditData] ✅ Успешно!', data);
+    console.log('[generateAuditData] ✅ Данные успешно получены');
+    console.log('[generateAuditData] Data size:', JSON.stringify(data).length, 'байт');
     return data;
-    
   } catch (error) {
-    console.error('[generateAuditData] ❌ Ошибка:', error.message);
+    clearTimeout(timeoutId);
+
+    // Проверяем тип ошибки
+    if (error.name === 'AbortError') {
+      console.error('[generateAuditData] ⏱️ Timeout: сервер не ответил за 5 минут');
+      throw new Error('Backend timeout: сервер не ответил в течение 5 минут');
+    }
+
+    if (error.message === 'Failed to fetch') {
+      console.error('[generateAuditData] 🌐 Network error: не удается подключиться к серверу');
+      throw new Error('Network error: не удается подключиться к серверу. Проверьте, что сервер запущен и доступен.');
+    }
+
+    console.error('[generateAuditData] ❌ Error:', error.message);
     throw error;
   }
 };

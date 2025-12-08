@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://audit.seo-performance.ru:8080/generate-url';
+const API_BASE_URL = 'https://audit.seo-performance.ru:8080/test';
 
 const cities = [
   { name: 'Москва', id: 213, code: 'msk' },

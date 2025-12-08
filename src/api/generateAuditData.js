@@ -28,14 +28,12 @@ const buildPayload = (cityCode, cityId, urls) => {
 };
 
 export const generateAuditData = async (params) => {
-  // ✅ Новое: преобразуем название города в код и id
   const city = cities.find(c => c.name === params.city);
   
   if (!city) {
     throw new Error(`❌ Город "${params.city}" не найден в справочнике`);
   }
 
-  // Берём URL из site и competitors
   const urls = [
     params.site,
     ...(params.competitors || [])
@@ -45,10 +43,8 @@ export const generateAuditData = async (params) => {
     throw new Error('❌ Укажите хотя бы один URL сайта');
   }
 
-  // Берём первые 5 URL (или меньше если есть)
   const urlsArray = urls.slice(0, 5);
   
-  // Если URL меньше 5, заполняем пустыми строками
   while (urlsArray.length < 5) {
     urlsArray.push('');
   }
@@ -57,7 +53,8 @@ export const generateAuditData = async (params) => {
   
   console.log('[generateAuditData] 📤 Отправляем:', payload);
   console.log(`[generateAuditData] Город: ${city.name} (${city.code}/${city.id})`);
- try {
+
+  try {
     const startResponse = await fetch(`${API_BASE_URL}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -72,7 +69,7 @@ export const generateAuditData = async (params) => {
 
     const { taskId, statusUrl } = await startResponse.json();
     console.log(`[generateAuditData] ✅ Анализ запущен, taskId: ${taskId}`);
-я 
+
     // Опрашивание статуса...
     let completed = false;
     let attempts = 0;

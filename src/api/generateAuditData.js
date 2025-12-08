@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://109.172.37.52:8080/test';
+const API_BASE_URL = 'http://109.172.37.52:3000/generate-url';
 
 export const generateAuditData = async (params) => {
   const payload = buildPayload(params);

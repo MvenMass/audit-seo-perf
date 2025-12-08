@@ -57,12 +57,13 @@ export const generateAuditData = async (params) => {
   
   console.log('[generateAuditData] 📤 Отправляем:', payload);
   console.log(`[generateAuditData] Город: ${city.name} (${city.code}/${city.id})`);
-
-  try {
+ try {
     const startResponse = await fetch(`${API_BASE_URL}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      mode: 'cors',
+      credentials: 'omit' 
     });
 
     if (!startResponse.ok) {

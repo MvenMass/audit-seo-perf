@@ -1,6 +1,5 @@
-const API_BASE_URL = 'http://109.172.37.52:3000/generate-url';
+const API_BASE_URL = 'http://localhost:3000/generate-url'; 
 
-// Данные городов
 const cities = [
   { name: 'Москва', id: 213, code: 'msk' },
   { name: 'Ростов-на-Дону', id: 39, code: 'rnd' },
@@ -20,7 +19,6 @@ const cities = [
   { name: 'Томск', id: 67, code: 'tom' }
 ];
 
-// Функция для построения payload
 const buildPayload = (params) => {
   return {
     cityCode: params.cityCode,
@@ -36,12 +34,16 @@ const buildPayload = (params) => {
 };
 
 export const generateAuditData = async (params) => {
+  // Проверка параметров
+  if (!params?.cityCode || !params?.cityId) {
+    console.error('[generateAuditData] ❌ cityCode и cityId обязательны!');
+    throw new Error('cityCode и cityId не переданы');
+  }
+
   const payload = buildPayload(params);
-  
   console.log('[generateAuditData] 📤 Отправляем:', payload);
 
   try {
-    // Шаг 1: Запустить анализ
     const startResponse = await fetch(`${API_BASE_URL}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -55,13 +57,13 @@ export const generateAuditData = async (params) => {
     const { taskId, statusUrl } = await startResponse.json();
     console.log(`[generateAuditData] ✅ Анализ запущен, taskId: ${taskId}`);
 
-    // Шаг 2: Опрашивать статус каждые 5 секунд
+    // Опрашивание статуса...
     let completed = false;
     let attempts = 0;
-    const maxAttempts = 360; // 30 минут (5 сек × 360)
+    const maxAttempts = 360;
 
     while (!completed && attempts < maxAttempts) {
-      await new Promise(resolve => setTimeout(resolve, 5000)); // Ждём 5 сек
+      await new Promise(resolve => setTimeout(resolve, 5000));
       attempts++;
 
       const statusResponse = await fetch(`${API_BASE_URL}${statusUrl}`);
@@ -91,4 +93,5 @@ export const generateAuditData = async (params) => {
   }
 };
 
+export { cities };
 export default generateAuditData;

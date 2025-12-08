@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:3000/generate-url';
+const API_BASE_URL = 'http://109.172.37.52:3000/generate-url';
 
 const cities = [
   { name: 'Москва', id: 213, code: 'msk' },

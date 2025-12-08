@@ -1,229 +1,131 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { generateAuditData } from "../api/generateAuditData";
+const API_BASE_URL = 'https://audit.seo-performance.ru:3000/generate-url';
 
-const BASE_CITIES = [
-  "Москва",
-  "Санкт-Петербург",
-  "Новосибирск",
-  "Екатеринбург",
-  "Казань",
-  "Нижний Новгород",
-  "Челябинск",
-  "Самара",
-  "Ростов-на-Дону",
-  "Уфа",
-  "Воронеж",
-  "Пермь",
-  "Красноярск",
-  "Волгоград",
-  "Саратов",
-  "Тюмень"
+const cities = [
+  { name: 'Москва', id: 213, code: 'msk' },
+  { name: 'Ростов-на-Дону', id: 39, code: 'rnd' },
+  { name: 'Екатеринбург', id: 54, code: 'ekb' },
+  { name: 'Уфа', id: 172, code: 'ufa' },
+  { name: 'Краснодар', id: 35, code: 'krr' },
+  { name: 'Пермь', id: 50, code: 'prm' },
+  { name: 'Самара', id: 51, code: 'sam' },
+  { name: 'Красноярск', id: 62, code: 'kry' },
+  { name: 'Омск', id: 66, code: 'oms' },
+  { name: 'Казань', id: 43, code: 'kzn' },
+  { name: 'Новосибирск', id: 65, code: 'nsk' },
+  { name: 'Н. Новгород', id: 47, code: 'nnv' },
+  { name: 'Волгоград', id: 38, code: 'vlg' },
+  { name: 'Воронеж', id: 193, code: 'vrn' },
+  { name: 'Санкт-Петербург', id: 2, code: 'spb' },
+  { name: 'Томск', id: 67, code: 'tom' }
 ];
 
-const UrlGenerator = () => {
-  const navigate = useNavigate();
-  const [city, setCity] = useState("");
-  const [site, setSite] = useState("");
-  const [competitors, setCompetitors] = useState([
-    "https://mosseo.ru/",
-    "https://cinar.ru/",
-    "https://stk-promo.com/",
-    "https://www.gemius.ru/",
-    "https://www.advertpro.ru/"
-  ]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  const handleCompetitorChange = (index, value) => {
-    const newCompetitors = [...competitors];
-    newCompetitors[index] = value;
-    setCompetitors(newCompetitors);
+const buildPayload = (cityCode, cityId, urls) => {
+  return {
+    cityCode,
+    cityId,
+    urls
   };
-
-  const handleGenerate = async () => {
-    // Проверяем обязательные поля
-    if (!city.trim() || !site.trim()) {
-      setError("❌ Пожалуйста, заполните поля 'Ваш город' и 'Ваш сайт'");
-      return;
-    }
-
-    // Очищаем предыдущие ошибки
-    setError(null);
-
-    const formData = {
-      city,
-      site,
-      competitors: competitors.filter(comp => comp.trim() !== "")
-    };
-
-    setLoading(true);
-
-    try {
-      console.log('[UrlGenerator] 📤 Начинаем анализ...');
-      
-      // Пытаемся получить данные от backend
-      const auditData = await generateAuditData(formData);
-
-      console.log('[UrlGenerator] ✅ Данные получены, переходим на страницу результатов');
-      
-      // Если успешно, передаем оба набора данных
-      navigate('/audit-results', {
-        state: {
-          formData,
-          auditData // Данные от backend
-        }
-      });
-
-    } catch (err) {
-      console.error('[UrlGenerator] ❌ Error:', err.message);
-
-      // Определяем тип ошибки и показываем соответствующее сообщение
-      let errorMessage = "❌ Ошибка при анализе сайта";
-
-      if (err.message.includes('timeout')) {
-        errorMessage = "⏱️ Анализ занял слишком долго (более 30 минут). Пожалуйста, попробуйте позже.";
-      } else if (err.message.includes('Network error') || err.message.includes('Failed to fetch')) {
-        errorMessage = "🌐 Не удается подключиться к серверу. Проверьте интернет-соединение и убедитесь, что сервер запущен.";
-      } else if (err.message.includes('Backend error')) {
-        errorMessage = `⚠️ Ошибка сервера: ${err.message}`;
-      } else if (err.message.includes('не найден в справочнике')) {
-        errorMessage = `❌ ${err.message}`;
-      } else if (err.message.includes('Укажите хотя бы один URL')) {
-        errorMessage = `❌ ${err.message}`;
-      } else if (err.message.includes('Invalid')) {
-        errorMessage = `❌ ${err.message}`;
-      } else {
-        errorMessage = `❌ ${err.message}`;
-      }
-
-      setError(errorMessage);
-
-      // Опционально: все равно показать результаты с fallback данными
-      // Раскомментируй эту часть, если хочешь показывать результаты даже при ошибке
-      /*
-      console.warn('[UrlGenerator] 📊 Backend недоступен, используем fallback данные');
-      navigate('/audit-results', {
-        state: {
-          formData,
-          // auditData не передаем - будет использован fallback из auditData.json
-          errorMessage: 'Анализ данных выполнен с использованием кэша (backend недоступен)'
-        }
-      });
-      */
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleClear = () => {
-    setCity("");
-    setSite("");
-    setCompetitors([
-      "https://mosseo.ru/",
-      "https://cinar.ru/",
-      "https://stk-promo.com/",
-      "https://www.gemius.ru/",
-      "https://www.advertpro.ru/"
-    ]);
-    setError(null);
-  };
-
-  return (
-    <div className="url-generator">
-      <div className="url-generator-header">
-        <span>Аудит сайта</span> от Seo Performance
-      </div>
-
-      {/* Показываем ошибку, если она есть */}
-      {error && (
-        <div className="url-generator-error">
-          {error}
-        </div>
-      )}
-
-      <div className="url-generator-block">
-        <label className="url-generator-label">Ваш город:</label>
-        <select
-          className="url-generator-input"
-          value={city}
-          onChange={e => {
-            setCity(e.target.value);
-            setError(null); // Очищаем ошибку при изменении поля
-          }}
-          disabled={loading}
-        >
-          <option value="">Выберите город</option>
-          {BASE_CITIES.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="url-generator-block">
-        <label className="url-generator-label">Ваш сайт:</label>
-        <input
-          type="text"
-          value={site}
-          onChange={(e) => {
-            setSite(e.target.value);
-            setError(null); // Очищаем ошибку при изменении поля
-          }}
-          placeholder="Введите сайт (например: example.com)"
-          className="url-generator-input"
-          disabled={loading}
-        />
-      </div>
-
-      <div className="url-generator-block url-generator-block__container">
-        <label className="url-generator-label">Укажите сайты конкурентов (опционально):</label>
-        <div className="url-generator-block__conc">
-          {competitors.map((comp, index) => (
-            <input
-              key={index}
-              type="text"
-              value={comp}
-              onChange={(e) => {
-                handleCompetitorChange(index, e.target.value);
-                setError(null); // Очищаем ошибку при изменении поля
-              }}
-              placeholder={`Сайт конкурента ${index + 1}`}
-              className="url-generator-input url-generator-input-conc"
-              disabled={loading}
-            />
-          ))}
-        </div>
-      </div>
-
-      <div className="url-generator-buttons">
-        <button
-          className="url-generator-generate"
-          onClick={handleGenerate}
-          disabled={loading}
-        >
-          {loading ? '⏳ Анализирование... (может занять до 30 минут)' : '🔍 Начать анализ'}
-        </button>
-        <button
-          className="url-generator-clear"
-          onClick={handleClear}
-          disabled={loading}
-        >
-          🗑️ Очистить данные
-        </button>
-      </div>
-
-      {/* Информация о процессе загрузки */}
-      {loading && (
-        <div className="url-generator-info">
-          <p>⏳ Пожалуйста, подождите...</p>
-          <p>Анализ может занять от 1 до 30 минут в зависимости от нагрузки на сервер.</p>
-          <p>Не закрывайте эту страницу и не обновляйте браузер.</p>
-        </div>
-      )}
-    </div>
-  );
 };
 
-export default UrlGenerator;
+export const generateAuditData = async (params) => {
+  const city = cities.find(c => c.name === params.city);
+  
+  if (!city) {
+    throw new Error(`❌ Город "${params.city}" не найден в справочнике`);
+  }
+
+  const urls = [
+    params.site,
+    ...(params.competitors || [])
+  ].filter(url => url.trim() !== '');
+
+  if (urls.length < 1) {
+    throw new Error('❌ Укажите хотя бы один URL сайта');
+  }
+
+  const urlsArray = urls.slice(0, 5);
+  
+  while (urlsArray.length < 5) {
+    urlsArray.push('');
+  }
+
+  const payload = buildPayload(city.code, city.id, urlsArray);
+  
+  console.log('[generateAuditData] 📤 Отправляем:', JSON.stringify(payload, null, 2));
+  console.log(`[generateAuditData] Город: ${city.name} (${city.code}/${city.id})`);
+
+  try {
+    const startResponse = await fetch(`${API_BASE_URL}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      mode: 'cors',
+      credentials: 'omit' 
+    });
+
+    console.log('[generateAuditData] 📊 Статус ответа:', startResponse.status);
+
+    // ✅ ПОЛУЧИ ТЕКСТ ОШИБКИ ОТ СЕРВЕРА
+    const responseText = await startResponse.text();
+    console.log('[generateAuditData] 📝 Тело ответа:', responseText);
+
+    if (!startResponse.ok) {
+      console.error('[generateAuditData] ❌ Ошибка сервера:', responseText);
+      throw new Error(`Ошибка запуска: ${startResponse.status} - ${responseText}`);
+    }
+
+    // Парси JSON только если статус OK
+    let responseData;
+    try {
+      responseData = JSON.parse(responseText);
+    } catch (e) {
+      throw new Error(`Ошибка парсинга JSON: ${responseText}`);
+    }
+
+    const { taskId, statusUrl } = responseData;
+    
+    if (!taskId || !statusUrl) {
+      console.error('[generateAuditData] ❌ Ошибка: отсутствует taskId или statusUrl');
+      throw new Error('Сервер вернул неполные данные');
+    }
+
+    console.log(`[generateAuditData] ✅ Анализ запущен, taskId: ${taskId}`);
+
+    // Опрашивание статуса...
+    let completed = false;
+    let attempts = 0;
+    const maxAttempts = 360;
+
+    while (!completed && attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      attempts++;
+
+      const statusResponse = await fetch(`${API_BASE_URL}${statusUrl}`);
+      
+      if (!statusResponse.ok) {
+        throw new Error(`Ошибка проверки статуса: ${statusResponse.status}`);
+      }
+
+      const status = await statusResponse.json();
+      console.log(`[generateAuditData] Попытка ${attempts}: статус = ${status.status}`);
+
+      if (status.status === 'completed') {
+        console.log('[generateAuditData] ✅ Успех!', status.data);
+        return status.data;
+      }
+
+      if (status.status === 'failed') {
+        throw new Error(`Анализ ошибка: ${status.error}`);
+      }
+    }
+
+    throw new Error('Анализ занял слишком долго (30+ минут)');
+
+  } catch (error) {
+    console.error('[generateAuditData] ❌ Ошибка:', error.message);
+    throw error;
+  }
+};
+
+export { cities };
+export default generateAuditData;

@@ -5,10 +5,11 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api': {
-        target: 'http://109.172.37.52:8080',  // ← ТВОЙ сервер
+      '/test': {
+        target: 'https://audit.seo-performance.ru:3000',
         changeOrigin: true,
-        secure: false
+        secure: false, // если используешь самоподписанный SSL-сертификат
+        rewrite: (path) => path.replace(/^\/test/, '/test')
       }
     }
   }

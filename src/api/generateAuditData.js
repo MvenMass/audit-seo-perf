@@ -17,7 +17,7 @@ const cities = [
   { name: 'Томск', id: 67, code: 'tom' }
 ]
 
-const EXTERNAL_API_URL = "http://109.172.37.52:3000/generate-url"
+const EXTERNAL_API_URL = "http://audit.seo-performance.ru:8080/generate-url"
 
 const buildPayload = (cityCode, cityId, urls) => {
   return {

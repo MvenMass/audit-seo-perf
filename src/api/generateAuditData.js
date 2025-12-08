@@ -1,5 +1,40 @@
 const API_BASE_URL = 'http://109.172.37.52:3000/generate-url';
 
+// Данные городов
+const cities = [
+  { name: 'Москва', id: 213, code: 'msk' },
+  { name: 'Ростов-на-Дону', id: 39, code: 'rnd' },
+  { name: 'Екатеринбург', id: 54, code: 'ekb' },
+  { name: 'Уфа', id: 172, code: 'ufa' },
+  { name: 'Краснодар', id: 35, code: 'krr' },
+  { name: 'Пермь', id: 50, code: 'prm' },
+  { name: 'Самара', id: 51, code: 'sam' },
+  { name: 'Красноярск', id: 62, code: 'kry' },
+  { name: 'Омск', id: 66, code: 'oms' },
+  { name: 'Казань', id: 43, code: 'kzn' },
+  { name: 'Новосибирск', id: 65, code: 'nsk' },
+  { name: 'Н. Новгород', id: 47, code: 'nnv' },
+  { name: 'Волгоград', id: 38, code: 'vlg' },
+  { name: 'Воронеж', id: 193, code: 'vrn' },
+  { name: 'Санкт-Петербург', id: 2, code: 'spb' },
+  { name: 'Томск', id: 67, code: 'tom' }
+];
+
+// Функция для построения payload
+const buildPayload = (params) => {
+  return {
+    cityCode: params.cityCode,
+    cityId: params.cityId,
+    urls: [
+      params.url1,
+      params.url2,
+      params.url3,
+      params.url4,
+      params.url5
+    ]
+  };
+};
+
 export const generateAuditData = async (params) => {
   const payload = buildPayload(params);
   

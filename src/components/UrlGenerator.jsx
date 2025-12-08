@@ -25,7 +25,13 @@ const UrlGenerator = () => {
   const navigate = useNavigate();
   const [city, setCity] = useState("");
   const [site, setSite] = useState("");
-  const [competitors, setCompetitors] = useState(["https://mosseo.ru/", "https://cinar.ru/", "https://stk-promo.com/", "https://www.gemius.ru/", "https://www.advertpro.ru/"]);
+  const [competitors, setCompetitors] = useState([
+    "https://mosseo.ru/",
+    "https://cinar.ru/",
+    "https://stk-promo.com/",
+    "https://www.gemius.ru/",
+    "https://www.advertpro.ru/"
+  ]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -68,6 +74,7 @@ const UrlGenerator = () => {
           auditData // Данные от backend
         }
       });
+
     } catch (err) {
       console.error('[UrlGenerator] ❌ Error:', err.message);
 
@@ -75,12 +82,16 @@ const UrlGenerator = () => {
       let errorMessage = "❌ Ошибка при анализе сайта";
 
       if (err.message.includes('timeout')) {
-        errorMessage = "⏱️ Анализ занял слишком долго (более 5 минут). Пожалуйста, попробуйте позже.";
+        errorMessage = "⏱️ Анализ занял слишком долго (более 30 минут). Пожалуйста, попробуйте позже.";
       } else if (err.message.includes('Network error') || err.message.includes('Failed to fetch')) {
         errorMessage = "🌐 Не удается подключиться к серверу. Проверьте интернет-соединение и убедитесь, что сервер запущен.";
       } else if (err.message.includes('Backend error')) {
         errorMessage = `⚠️ Ошибка сервера: ${err.message}`;
       } else if (err.message.includes('не найден в справочнике')) {
+        errorMessage = `❌ ${err.message}`;
+      } else if (err.message.includes('Укажите хотя бы один URL')) {
+        errorMessage = `❌ ${err.message}`;
+      } else if (err.message.includes('Invalid')) {
         errorMessage = `❌ ${err.message}`;
       } else {
         errorMessage = `❌ ${err.message}`;
@@ -108,7 +119,13 @@ const UrlGenerator = () => {
   const handleClear = () => {
     setCity("");
     setSite("");
-    setCompetitors(["https://mosseo.ru/", "https://cinar.ru/", "https://stk-promo.com/", "https://www.gemius.ru/", "https://www.advertpro.ru/"]);
+    setCompetitors([
+      "https://mosseo.ru/",
+      "https://cinar.ru/",
+      "https://stk-promo.com/",
+      "https://www.gemius.ru/",
+      "https://www.advertpro.ru/"
+    ]);
     setError(null);
   };
 
@@ -186,7 +203,7 @@ const UrlGenerator = () => {
           onClick={handleGenerate}
           disabled={loading}
         >
-          {loading ? '⏳ Анализирование... (может занять до 5 минут)' : '🔍 Начать анализ'}
+          {loading ? '⏳ Анализирование... (может занять до 30 минут)' : '🔍 Начать анализ'}
         </button>
         <button
           className="url-generator-clear"
@@ -201,7 +218,8 @@ const UrlGenerator = () => {
       {loading && (
         <div className="url-generator-info">
           <p>⏳ Пожалуйста, подождите...</p>
-          <p>Анализ может занять от 1 до 5 минут в зависимости от нагрузки на сервер.</p>
+          <p>Анализ может занять от 1 до 30 минут в зависимости от нагрузки на сервер.</p>
+          <p>Не закрывайте эту страницу и не обновляйте браузер.</p>
         </div>
       )}
     </div>

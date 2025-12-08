@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:3000/generate-url'; 
+const API_BASE_URL = 'http://localhost:3000/generate-url';
 
 const cities = [
   { name: 'Москва', id: 213, code: 'msk' },
@@ -19,29 +19,44 @@ const cities = [
   { name: 'Томск', id: 67, code: 'tom' }
 ];
 
-const buildPayload = (params) => {
+const buildPayload = (cityCode, cityId, urls) => {
   return {
-    cityCode: params.cityCode,
-    cityId: params.cityId,
-    urls: [
-      params.url1,
-      params.url2,
-      params.url3,
-      params.url4,
-      params.url5
-    ]
+    cityCode,
+    cityId,
+    urls
   };
 };
 
 export const generateAuditData = async (params) => {
-  // Проверка параметров
-  if (!params?.cityCode || !params?.cityId) {
-    console.error('[generateAuditData] ❌ cityCode и cityId обязательны!');
-    throw new Error('cityCode и cityId не переданы');
+  // ✅ Новое: преобразуем название города в код и id
+  const city = cities.find(c => c.name === params.city);
+  
+  if (!city) {
+    throw new Error(`❌ Город "${params.city}" не найден в справочнике`);
   }
 
-  const payload = buildPayload(params);
+  // Берём URL из site и competitors
+  const urls = [
+    params.site,
+    ...(params.competitors || [])
+  ].filter(url => url.trim() !== '');
+
+  if (urls.length < 1) {
+    throw new Error('❌ Укажите хотя бы один URL сайта');
+  }
+
+  // Берём первые 5 URL (или меньше если есть)
+  const urlsArray = urls.slice(0, 5);
+  
+  // Если URL меньше 5, заполняем пустыми строками
+  while (urlsArray.length < 5) {
+    urlsArray.push('');
+  }
+
+  const payload = buildPayload(city.code, city.id, urlsArray);
+  
   console.log('[generateAuditData] 📤 Отправляем:', payload);
+  console.log(`[generateAuditData] Город: ${city.name} (${city.code}/${city.id})`);
 
   try {
     const startResponse = await fetch(`${API_BASE_URL}`, {

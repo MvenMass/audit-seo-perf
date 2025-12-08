@@ -23,7 +23,11 @@ const buildPayload = (cityCode, cityId, urls) => {
   return {
     cityCode,
     cityId,
-    urls
+    url1: urls[0] || '',
+    url2: urls[1] || '',
+    url3: urls[2] || '',
+    url4: urls[3] || '',
+    url5: urls[4] || ''
   };
 };
 
@@ -44,14 +48,13 @@ export const generateAuditData = async (params) => {
   }
 
   const urlsArray = urls.slice(0, 5);
-  
   while (urlsArray.length < 5) {
     urlsArray.push('');
   }
 
   const payload = buildPayload(city.code, city.id, urlsArray);
   
-  console.log('[generateAuditData] 📤 Отправляем:', payload);
+  console.log('[generateAuditData] 📤 Отправляем:', JSON.stringify(payload, null, 2));
   console.log(`[generateAuditData] Город: ${city.name} (${city.code}/${city.id})`);
 
   try {
@@ -63,42 +66,19 @@ export const generateAuditData = async (params) => {
       credentials: 'omit' 
     });
 
+    console.log('[generateAuditData] 📊 Статус ответа:', startResponse.status);
+
     if (!startResponse.ok) {
-      throw new Error(`Ошибка запуска: ${startResponse.status}`);
+      const errorText = await startResponse.text();
+      console.error('[generateAuditData] ❌ Ошибка сервера:', errorText);
+      throw new Error(`Ошибка запуска: ${startResponse.status} - ${errorText}`);
     }
 
-    const { taskId, statusUrl } = await startResponse.json();
-    console.log(`[generateAuditData] ✅ Анализ запущен, taskId: ${taskId}`);
-
-    // Опрашивание статуса...
-    let completed = false;
-    let attempts = 0;
-    const maxAttempts = 360;
-
-    while (!completed && attempts < maxAttempts) {
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      attempts++;
-
-      const statusResponse = await fetch(`${API_BASE_URL}${statusUrl}`);
-      
-      if (!statusResponse.ok) {
-        throw new Error(`Ошибка проверки статуса: ${statusResponse.status}`);
-      }
-
-      const status = await statusResponse.json();
-      console.log(`[generateAuditData] Попытка ${attempts}: статус = ${status.status}`);
-
-      if (status.status === 'completed') {
-        console.log('[generateAuditData] ✅ Успех!', status.data);
-        return status.data;
-      }
-
-      if (status.status === 'failed') {
-        throw new Error(`Анализ ошибка: ${status.error}`);
-      }
-    }
-
-    throw new Error('Анализ занял слишком долго (30+ минут)');
+    // ✅ Сервер сразу возвращает данные
+    const auditData = await startResponse.json();
+    console.log('[generateAuditData] ✅ Данные получены!');
+    
+    return auditData;
 
   } catch (error) {
     console.error('[generateAuditData] ❌ Ошибка:', error.message);

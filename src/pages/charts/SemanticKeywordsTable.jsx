@@ -7,7 +7,16 @@ function SemanticKeywordsTable({ keywords = { total: 0, data: [] } }) {
   const allKeywords = keywords.data || [];
 
   if (!allKeywords || allKeywords.length === 0) {
-    return <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>Нет данных ключевых слов</div>;
+    return (
+      <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
+        <p style={{ fontSize: '18px', marginBottom: '10px' }}>
+          📊 Нет данных ключевых слов
+        </p>
+        <p style={{ fontSize: '14px', color: '#aaa' }}>
+          Данные отсутствуют в ответе API
+        </p>
+      </div>
+    );
   }
 
   const totalPages = Math.ceil(allKeywords.length / itemsPerPage);
@@ -43,7 +52,10 @@ function SemanticKeywordsTable({ keywords = { total: 0, data: [] } }) {
   const handlePageChange = (page) => {
     if (typeof page === 'number') {
       setCurrentPage(page);
-      document.getElementById('semantic-keywords-table')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.getElementById('semantic-keywords-table')?.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'start' 
+      });
     }
   };
 
@@ -60,20 +72,33 @@ function SemanticKeywordsTable({ keywords = { total: 0, data: [] } }) {
         <thead>
           <tr>
             <th>Ключевое слово/фраза</th>
-            <th>Частотность</th>
-            <th>ТОП 1</th>
-            <th>ТОП 5</th>
-            <th>ТОП 10</th>
+            <th>Тип</th>
+            <th>Общая частотность</th>
+            <th>Пик за месяц</th>
           </tr>
         </thead>
         <tbody>
           {currentData.map((row) => (
             <tr key={row.id}>
               <td>{row.keyword}</td>
-              <td>{row.frequency}</td>
-              <td>{row.top1}</td>
-              <td>{row.top5}</td>
-              <td>{row.top10}</td>
+              <td>
+                <span style={{
+                  padding: '4px 8px',
+                  borderRadius: '4px',
+                  fontSize: '12px',
+                  fontWeight: '500',
+                  backgroundColor: row.type === 'Коммерческий' 
+                    ? 'rgba(139, 92, 246, 0.1)' 
+                    : 'rgba(251, 146, 60, 0.1)',
+                  color: row.type === 'Коммерческий' 
+                    ? 'rgb(139, 92, 246)' 
+                    : 'rgb(251, 146, 60)'
+                }}>
+                  {row.type}
+                </span>
+              </td>
+              <td>{row.frequency.toLocaleString('ru-RU')}</td>
+              <td>{row.maxMonth.toLocaleString('ru-RU')}</td>
             </tr>
           ))}
         </tbody>
@@ -110,5 +135,7 @@ function SemanticKeywordsTable({ keywords = { total: 0, data: [] } }) {
     </div>
   );
 }
+
+
 
 export default SemanticKeywordsTable;

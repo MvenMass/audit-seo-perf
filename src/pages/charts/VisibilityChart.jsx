@@ -7,11 +7,13 @@ function VisibilityChart({ visibility = {} }) {
 
   const { commercial = 0, nonCommercial = 0, total = 0 } = visibility;
 
-  if (!visibility || total === 0) {
-    return <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>Нет данных видимости</div>;
-  }
-
+  // ✅ useEffect ВСЕГДА вызывается (перемещён ПЕРЕД условием return)
   useEffect(() => {
+    // Если нет данных — не инициализируем график
+    if (!visibility || total === 0) {
+      return;
+    }
+
     const checkAndInit = () => {
       if (
         window.am4core &&
@@ -40,7 +42,7 @@ function VisibilityChart({ visibility = {} }) {
         }
         const script = document.createElement('script');
         script.src = src;
-       script.defer = false;
+        script.defer = false;
         script.onload = () => {
           loadedCount++;
           if (loadedCount === scripts.length) checkAndInit();
@@ -61,11 +63,12 @@ function VisibilityChart({ visibility = {} }) {
         chartInstanceRef.current.dispose();
       }
     };
-  }, []);
+  }, [visibility, total]); // ✅ Добавлены зависимости
 
   useEffect(() => {
     if (!chartsReady) return;
     if (!chartRef.current) return;
+    if (!visibility || total === 0) return;
 
     try {
       window.am4core.useTheme(window.am4themes_animated);
@@ -117,7 +120,10 @@ function VisibilityChart({ visibility = {} }) {
       legend.margin(0, 30, 0, 20);
       legend.markers.template.width = 16;
       legend.markers.template.height = 16;
-      legend.markers.template.cornerRadius(8, 8, 8, 8);
+     legend.markers.template.cornerRadiusTopLeft = 8;
+legend.markers.template.cornerRadiusTopRight = 8;
+legend.markers.template.cornerRadiusBottomLeft = 8;
+legend.markers.template.cornerRadiusBottomRight = 8;
 
       series.sequencedInterpolation = true;
       series.sequencedInterpolationDelay = 30;
@@ -132,7 +138,12 @@ function VisibilityChart({ visibility = {} }) {
         chartInstanceRef.current.dispose();
       }
     };
-  }, [chartsReady, commercial, nonCommercial]);
+  }, [chartsReady, commercial, nonCommercial, visibility, total]);
+
+  // ✅ Условие возврата ПОСЛЕ всех хуков
+  if (!visibility || total === 0) {
+    return <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>Нет данных видимости</div>;
+  }
 
   return (
     <div className="visibility-container">

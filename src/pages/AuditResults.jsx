@@ -1,5 +1,6 @@
-import { useAuditData } from '../hooks/useAuditData';
+import { useState, useEffect } from 'react';
 import { useLocation } from "react-router-dom";
+import { transformAuditData } from '../utils/transformAuditData';
 import "./AuditResults.css";
 import CardNav from "../components/CardNav";
 import logo from "../assets/logomain.png";
@@ -39,20 +40,44 @@ const imageLogos = [
 ];
 
 function AuditResults() {
-  // ✅ СНАЧАЛА получаем location
   const location = useLocation();
-  
-  // ✅ ПОТОМ используем его
   const auditDataFromBackend = location.state?.auditData;
   const formData = location.state?.formData;
   
-  // ✅ Загружаем данные (либо от backend, либо fallback JSON)
-  const { data: auditData, loading, error } = useAuditData(
-    auditDataFromBackend || '/auditData.json'
-  );
-  
-  if (loading) return <div style={{ textAlign: 'center', padding: '100px' }}>Загрузка...</div>;
-  if (error) return <div style={{ textAlign: 'center', padding: '100px', color: 'red' }}>Ошибка: {error}</div>;
+  const [auditData, setAuditData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (auditDataFromBackend) {
+      // ✅ Трансформируем данные от API
+      const transformed = transformAuditData(auditDataFromBackend, formData);
+      setAuditData(transformed);
+      setLoading(false);
+      return;
+    }
+
+    // Загружаем из файла для разработки
+    const fetchData = async () => {
+      try {
+        const response = await fetch('/auditData.json');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const jsonData = await response.json();
+        setAuditData(jsonData);
+      } catch (err) {
+        console.error('Ошибка загрузки данных:', err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  console.log('🔍 Трансформированные данные:', auditData);
 
   const items = [
     {
@@ -223,7 +248,7 @@ function AuditResults() {
                 некоммерческих запросов по месяцам; помогает выявить пики спроса
                 и сезонные провалы
               </p>
-              <SeasonalityChart seasonalityData={auditData?.seasonality} />
+             <SeasonalityChart seasonalityData={auditData?.seasonality} />
             </section>
 
             {/* Секция: Наличие фавикона */}
@@ -280,10 +305,11 @@ function AuditResults() {
                   </div>
                 )}
               </div>
-              <RobotsChart 
-                robotsData={auditData?.robotsData} 
-                robotsTableData={auditData?.robotsTableData}
-              />
+           <RobotsChart 
+  robotsData={auditData?.robotsData}    
+  robotsTableData={auditData?.robotsTableData} 
+/>
+
             </section>
 
             {/* Секция: Итоговая статистика карты сайта */}

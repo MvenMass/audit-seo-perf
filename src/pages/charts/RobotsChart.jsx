@@ -1,202 +1,311 @@
 import { useState } from 'react';
-import { Bar } from 'react-chartjs-2';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend
-} from 'chart.js';
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend
-);
+function RobotsChart({ robotsTables = {}, robotsIssues = {}, sitemapTables = {} }) {
+  const [activeRobotsTab, setActiveRobotsTab] = useState('general');
+  const [activeSitemapTab, setActiveSitemapTab] = useState('main');
 
-function RobotsChart({ robotsData = {}, robotsTableData = [] }) {
-  const [activeTab, setActiveTab] = useState('top1');
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 9;
+  console.log('🔍 RobotsChart received:');
+  console.log('  robotsTables:', robotsTables);
+  console.log('  robotsIssues:', robotsIssues);
+  console.log('  sitemapTables:', sitemapTables);
 
-  // Fallback если нет данных
-  if (!robotsData || Object.keys(robotsData).length === 0) {
-    return <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>Нет данных robots</div>;
+  if (!robotsTables || Object.keys(robotsTables).length === 0) {
+    return (
+      <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>
+        Нет данных robots
+      </div>
+    );
   }
 
-  const currentTabData = robotsData[activeTab];
-
-  if (!currentTabData) {
-    return <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>Нет данных</div>;
-  }
-
-  const labels = currentTabData.labels || [];
-  const allRows = robotsTableData.length > 0 ? robotsTableData : [];
-
-  const totalPages = Math.ceil(allRows.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const tableRows = allRows.slice(startIndex, endIndex);
-
-  const getPageNumbers = () => {
-    const pages = [];
-    const maxPagesToShow = 5;
-
-    if (totalPages <= maxPagesToShow + 2) {
-      for (let i = 1; i <= totalPages; i++) {
-        pages.push(i);
-      }
-    } else {
-      pages.push(1);
-      if (currentPage > 3) pages.push('...');
-      let startPage = Math.max(2, currentPage - 1);
-      let endPage = Math.min(totalPages - 1, currentPage + 1);
-
-      if (currentPage <= 3) {
-        endPage = Math.min(totalPages - 1, 4);
-      }
-      if (currentPage > totalPages - 3) {
-        startPage = Math.max(2, totalPages - 3);
-      }
-
-      for (let i = startPage; i <= endPage; i++) {
-        pages.push(i);
-      }
-      if (currentPage < totalPages - 2) pages.push('...');
-      pages.push(totalPages);
-    }
-    return pages;
-  };
-
-  const pageNumbers = getPageNumbers();
-
-  const options = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { display: false },
-      tooltip: { mode: 'index', intersect: false }
-    },
-    scales: {
-      x: {
-        grid: { display: false },
-        offset: true
-      },
-      y: {
-        beginAtZero: true,
-        grid: { color: 'rgba(0, 0, 0, 0.05)' }
-      }
-    }
-  };
-
-  const chartData = {
-    labels,
-    datasets: [
-      {
-        label: currentTabData.title,
-        data: currentTabData.data,
-        backgroundColor: [
-          'rgba(139, 92, 246, 0.8)',
-          'rgba(251, 146, 60, 0.8)',
-          'rgba(34, 197, 94, 0.8)',
-          'rgba(251, 191, 36, 0.8)',
-          'rgba(59, 130, 246, 0.8)'
-        ],
-        borderRadius: 6,
-        borderSkipped: false
-      }
-    ]
-  };
-
-  const tabs = [
-    { id: 'top1', label: 'Запросы в ТОП 1' },
-    { id: 'top3', label: 'Запросы в ТОП 3' },
-    { id: 'top5', label: 'Запросы в ТОП 5' },
-    { id: 'percentage', label: 'Процент в ТОП 5' },
-    { id: 'pages', label: 'Страницы в индексе' },
-    { id: 'traffic', label: 'Посещаемость в день' }
+  const robotsTabs = [
+    { id: 'general', label: 'Данные robots.txt' },
+    { id: 'status', label: 'Статус проверки' },
+    { id: 'seo', label: 'SEO-анализ' },
+    { id: 'critical', label: 'Критические ошибки' },
+    { id: 'warnings', label: 'Предупреждения' },
   ];
+
+  const sitemapTabs = [
+    { id: 'main', label: 'Основная статистика' },
+    { id: 'statusCodes', label: 'Коды ответа' },
+    { id: 'recommendations', label: 'Рекомендации' },
+  ];
+
+  const currentRobotsTable =
+    activeRobotsTab === 'critical' || activeRobotsTab === 'warnings'
+      ? null
+      : robotsTables[activeRobotsTab];
+
+  const currentSitemapTable = sitemapTables[activeSitemapTab] || null;
+
+  const renderRobotsBody = () => {
+    // Для вкладок с ошибками/предупреждениями
+    if (activeRobotsTab === 'critical' || activeRobotsTab === 'warnings') {
+      const list =
+        activeRobotsTab === 'critical'
+          ? robotsIssues.critical || []
+          : robotsIssues.warnings || [];
+
+      console.log(`🔍 renderRobotsBody ${activeRobotsTab}:`, list);
+
+      if (!list || list.length === 0) {
+        return (
+          <tbody>
+            <tr>
+              <td colSpan={3} style={{ textAlign: 'center', color: '#999' }}>
+                Нет данных
+              </td>
+            </tr>
+          </tbody>
+        );
+      }
+
+      return (
+        <tbody>
+          {list.map((item) => (
+            <tr key={item.id}>
+              <td>{item.id}</td>
+              <td>{item.title}</td>
+              <td>{item.description}</td>
+            </tr>
+          ))}
+        </tbody>
+      );
+    }
+
+    // Для обычных таблиц (general/status/seo)
+    const rows = currentRobotsTable?.rows || [];
+
+    if (!rows.length) {
+      return (
+        <tbody>
+          <tr>
+            <td colSpan={3} style={{ textAlign: 'center', color: '#999' }}>
+              Нет данных
+            </td>
+          </tr>
+        </tbody>
+      );
+    }
+
+    if (activeRobotsTab === 'status') {
+      return (
+        <tbody>
+          {rows.map((row, idx) => (
+            <tr key={idx}>
+              <td>{row.label}</td>
+              <td>{row.value}</td>
+              <td>{row.status}</td>
+            </tr>
+          ))}
+        </tbody>
+      );
+    }
+
+    if (activeRobotsTab === 'seo') {
+      return (
+        <tbody>
+          {rows.map((row, idx) => (
+            <tr key={idx}>
+              <td>{row.label}</td>
+              <td>{row.value}</td>
+              <td>{row.status}</td>
+            </tr>
+          ))}
+        </tbody>
+      );
+    }
+
+    // general
+    return (
+      <tbody>
+        {rows.map((row, idx) => (
+          <tr key={idx}>
+            <td>{row.label}</td>
+            <td>{row.value}</td>
+          </tr>
+        ))}
+      </tbody>
+    );
+  };
+
+  const renderSitemapBody = () => {
+    // Проверяем, существует ли вообще таблица
+    if (!currentSitemapTable || !currentSitemapTable.rows) {
+      console.log(`🔍 No sitemap table for ${activeSitemapTab}`);
+      return (
+        <tbody>
+          <tr>
+            <td colSpan={4} style={{ textAlign: 'center', color: '#999' }}>
+              Нет данных
+            </td>
+          </tr>
+        </tbody>
+      );
+    }
+
+    const rows = currentSitemapTable.rows || [];
+
+    console.log(`🔍 renderSitemapBody ${activeSitemapTab}:`, rows);
+
+    if (!rows.length) {
+      return (
+        <tbody>
+          <tr>
+            <td colSpan={4} style={{ textAlign: 'center', color: '#999' }}>
+              Нет данных
+            </td>
+          </tr>
+        </tbody>
+      );
+    }
+
+    if (activeSitemapTab === 'statusCodes') {
+      return (
+        <tbody>
+          {rows.map((row, idx) => (
+            <tr key={idx}>
+              <td>{row.http}</td>
+              <td>{row.count}</td>
+              <td>{row.percent}%</td>
+              <td>{row.status}</td>
+            </tr>
+          ))}
+        </tbody>
+      );
+    }
+
+    if (activeSitemapTab === 'recommendations') {
+      if (!rows.length) {
+        return (
+          <tbody>
+            <tr>
+              <td colSpan={4} style={{ textAlign: 'center', color: '#999' }}>
+                Рекомендаций нет
+              </td>
+            </tr>
+          </tbody>
+        );
+      }
+
+      return (
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.id}>
+              <td>{row.type}</td>
+              <td>{row.title}</td>
+              <td>{row.description}</td>
+              <td>{row.suggestion}</td>
+            </tr>
+          ))}
+        </tbody>
+      );
+    }
+
+    // main
+    return (
+      <tbody>
+        {rows.map((row, idx) => (
+          <tr key={idx}>
+            <td>{row.label}</td>
+            <td>{row.value}</td>
+          </tr>
+        ))}
+      </tbody>
+    );
+  };
 
   return (
     <div className="chart-container">
-      {/* Табы */}
+      {/* ROBOTS.TXT */}
+      <h3 className="section-subtitle">robots.txt</h3>
       <div className="chart-buttons">
-        {tabs.map((tab) => (
+        {robotsTabs.map((tab) => (
           <button
             key={tab.id}
-            className={`chart-btn ${activeTab === tab.id ? 'active' : ''}`}
-            onClick={() => setActiveTab(tab.id)}
+            className={`chart-btn ${activeRobotsTab === tab.id ? 'active' : ''}`}
+            onClick={() => setActiveRobotsTab(tab.id)}
           >
             {tab.label}
           </button>
         ))}
       </div>
 
-      {/* График */}
-      <div style={{
-        height: '500px',
-        marginTop: '20px',
-        background: 'white',
-        borderRadius: '8px',
-        padding: '20px 40px 60px',
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
-      }}>
-        <Bar options={options} data={chartData} />
-      </div>
-
-      {/* Таблица и пагинация */}
-      <div className="traffic-table-container">
+      <div className="traffic-table-container" style={{ marginTop: 20 }}>
         <table className="traffic-table">
           <thead>
-            <tr>
-              <th>Строка</th>
-              <th>Клиент</th>
-              <th>Значение</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tableRows.map((row) => (
-              <tr key={row.id}>
-                <td>{row.status}</td>
-                <td>{row.query}</td>
-                <td>{row.info}</td>
+            {activeRobotsTab === 'status' ? (
+              <tr>
+                <th>Категория</th>
+                <th>Количество</th>
+                <th>Статус</th>
               </tr>
-            ))}
-          </tbody>
+            ) : activeRobotsTab === 'seo' ? (
+              <tr>
+                <th>Проверяемый параметр</th>
+                <th>Результат</th>
+                <th>Статус</th>
+              </tr>
+            ) : activeRobotsTab === 'critical' ||
+              activeRobotsTab === 'warnings' ? (
+              <tr>
+                <th>№</th>
+                <th>Название</th>
+                <th>Описание</th>
+              </tr>
+            ) : (
+              <tr>
+                <th>Показатель</th>
+                <th>Значение</th>
+              </tr>
+            )}
+          </thead>
+          {renderRobotsBody()}
         </table>
+      </div>
 
-        {totalPages > 1 && (
-          <div className="pagination">
-            <div className="pagination-buttons">
-              {pageNumbers.map((page, idx) => (
-                <button
-                  key={idx}
-                  className={`pagination-btn ${
-                    page === currentPage ? 'active' : ''
-                  } ${page === '...' ? 'dots' : ''}`}
-                  onClick={() => typeof page === 'number' && setCurrentPage(page)}
-                  disabled={page === '...'}
-                >
-                  {page}
-                </button>
-              ))}
-              {currentPage < totalPages && (
-                <button
-                  className="pagination-btn arrow-btn"
-                  onClick={() => setCurrentPage(currentPage + 1)}
-                  title="Следующая страница"
-                >
-                  →
-                </button>
-              )}
-            </div>
-          </div>
-        )}
+      {/* SITEMAP.XML */}
+      <h3 className="section-subtitle" style={{ marginTop: 40 }}>
+        sitemap.xml
+      </h3>
+      <div className="chart-buttons">
+        {sitemapTabs.map((tab) => (
+          <button
+            key={tab.id}
+            className={`chart-btn ${activeSitemapTab === tab.id ? 'active' : ''}`}
+            onClick={() => setActiveSitemapTab(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="traffic-table-container" style={{ marginTop: 20 }}>
+        <table className="traffic-table">
+          <thead>
+            {activeSitemapTab === 'statusCodes' ? (
+              <tr>
+                <th>HTTP код</th>
+                <th>Количество</th>
+                <th>Процент</th>
+                <th>Статус</th>
+              </tr>
+            ) : activeSitemapTab === 'recommendations' ? (
+              <tr>
+                <th>Тип</th>
+                <th>Название</th>
+                <th>Описание</th>
+                <th>Рекомендация</th>
+              </tr>
+            ) : (
+              <tr>
+                <th>Показатель</th>
+                <th>Значение</th>
+              </tr>
+            )}
+          </thead>
+          {renderSitemapBody()}
+        </table>
       </div>
     </div>
   );

@@ -7,14 +7,14 @@ function VisibilityChart({ visibility = {} }) {
 
   const { commercial = 0, nonCommercial = 0, total = 0 } = visibility;
 
-  // ✅ useEffect ВСЕГДА вызывается (перемещён ПЕРЕД условием return)
+  // Загрузка скриптов и подготовка библиотеки
   useEffect(() => {
-    // Если нет данных — не инициализируем график
-    if (!visibility || total === 0) {
-      return;
-    }
+    if (!visibility || total === 0) return;
+
+    let cancelled = false;
 
     const checkAndInit = () => {
+      if (cancelled) return;
       if (
         window.am4core &&
         window.am4charts &&
@@ -31,44 +31,63 @@ function VisibilityChart({ visibility = {} }) {
       const scripts = [
         'https://cdn.amcharts.com/lib/4/core.js',
         'https://cdn.amcharts.com/lib/4/charts.js',
-        'https://cdn.amcharts.com/lib/4/themes/animated.js'
+        'https://cdn.amcharts.com/lib/4/themes/animated.js',
       ];
+
       let loadedCount = 0;
-      scripts.forEach(src => {
-        if (document.querySelector(`script[src="${src}"]`)) {
+
+      scripts.forEach((src) => {
+        const existing = document.querySelector(`script[src="${src}"]`);
+        if (existing) {
           loadedCount++;
           if (loadedCount === scripts.length) checkAndInit();
           return;
         }
+
         const script = document.createElement('script');
         script.src = src;
-        script.defer = false;
+        script.async = false;
         script.onload = () => {
           loadedCount++;
           if (loadedCount === scripts.length) checkAndInit();
         };
-        script.onerror = () => {};
+        script.onerror = (e) => {
+          console.error('amCharts script load error:', src, e);
+        };
         document.head.appendChild(script);
       });
     };
 
-    if (window.am4core && window.am4charts) {
+    if (
+      window.am4core &&
+      window.am4charts &&
+      window.am4themes_animated
+    ) {
       checkAndInit();
     } else {
       loadScripts();
     }
 
     return () => {
+      cancelled = true;
       if (chartInstanceRef.current) {
         chartInstanceRef.current.dispose();
+        chartInstanceRef.current = null;
       }
     };
-  }, [visibility, total]); // ✅ Добавлены зависимости
+  }, [visibility, total]);
 
+  // Инициализация и обновление графика
   useEffect(() => {
     if (!chartsReady) return;
     if (!chartRef.current) return;
     if (!visibility || total === 0) return;
+
+    // очищаем предыдущий инстанс если был
+    if (chartInstanceRef.current) {
+      chartInstanceRef.current.dispose();
+      chartInstanceRef.current = null;
+    }
 
     try {
       window.am4core.useTheme(window.am4themes_animated);
@@ -78,13 +97,14 @@ function VisibilityChart({ visibility = {} }) {
         window.am4charts.PieChart3D
       );
       chartInstanceRef.current = chart;
+
       chart.hiddenState.properties.opacity = 0;
       chart.depth = 10;
       chart.angle = 15;
 
       chart.data = [
         { category: 'Коммерческие', value: commercial },
-        { category: 'Некоммерческие', value: nonCommercial }
+        { category: 'Некоммерческие', value: nonCommercial },
       ];
 
       const series = chart.series.push(new window.am4charts.PieSeries3D());
@@ -95,7 +115,7 @@ function VisibilityChart({ visibility = {} }) {
 
       const colors = [
         window.am4core.color('#3B82F6'),
-        window.am4core.color('#FB923C')
+        window.am4core.color('#FB923C'),
       ];
       series.slices.template.adapter.add('fill', (fill, target) => {
         if (target.dataItem) {
@@ -112,18 +132,18 @@ function VisibilityChart({ visibility = {} }) {
 
       const legend = new window.am4charts.Legend();
       chart.legend = legend;
-      legend.position = "right";
-      legend.valign = "middle";
-      legend.contentAlign = "left";
+      legend.position = 'right';
+      legend.valign = 'middle';
+      legend.contentAlign = 'left';
       legend.labels.template.fontSize = 13;
       legend.labels.template.fill = window.am4core.color('#666');
       legend.margin(0, 30, 0, 20);
       legend.markers.template.width = 16;
       legend.markers.template.height = 16;
-     legend.markers.template.cornerRadiusTopLeft = 8;
-legend.markers.template.cornerRadiusTopRight = 8;
-legend.markers.template.cornerRadiusBottomLeft = 8;
-legend.markers.template.cornerRadiusBottomRight = 8;
+      legend.markers.template.cornerRadiusTopLeft = 8;
+      legend.markers.template.cornerRadiusTopRight = 8;
+      legend.markers.template.cornerRadiusBottomLeft = 8;
+      legend.markers.template.cornerRadiusBottomRight = 8;
 
       series.sequencedInterpolation = true;
       series.sequencedInterpolationDelay = 30;
@@ -136,13 +156,17 @@ legend.markers.template.cornerRadiusBottomRight = 8;
     return () => {
       if (chartInstanceRef.current) {
         chartInstanceRef.current.dispose();
+        chartInstanceRef.current = null;
       }
     };
   }, [chartsReady, commercial, nonCommercial, visibility, total]);
 
-  // ✅ Условие возврата ПОСЛЕ всех хуков
   if (!visibility || total === 0) {
-    return <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>Нет данных видимости</div>;
+    return (
+      <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>
+        Нет данных видимости
+      </div>
+    );
   }
 
   return (
@@ -165,19 +189,24 @@ legend.markers.template.cornerRadiusBottomRight = 8;
           </tbody>
         </table>
       </div>
-      <div className="amcharts-wrapper" style={{ display: "flex", alignItems: "center" }}>
+      <div
+        className="amcharts-wrapper"
+        style={{ display: 'flex', alignItems: 'center' }}
+      >
         <div
           ref={chartRef}
           className="amcharts-container"
-          style={{ width: "100%", height: "700px", minWidth: "380px" }}
+          style={{ width: '100%', height: '700px', minWidth: '380px' }}
         >
           {!chartsReady && (
-            <div style={{
-              textAlign: "center",
-              width: "100%",
-              padding: "60px",
-              color: "#888"
-            }}>
+            <div
+              style={{
+                textAlign: 'center',
+                width: '100%',
+                padding: '60px',
+                color: '#888',
+              }}
+            >
               Загрузка графика...
             </div>
           )}

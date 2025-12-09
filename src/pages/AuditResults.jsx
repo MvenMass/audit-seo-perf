@@ -109,6 +109,15 @@ function AuditResults() {
       ],
     },
   ];
+const yandexFirstTraffic =
+  auditData?.traffic && auditData.traffic.length
+    ? auditData.traffic[0].traffic || 0
+    : 0;
+
+const googleFirstTraffic =
+  auditData?.trafficGoogle && auditData.trafficGoogle.length
+    ? auditData.trafficGoogle[0].traffic || 0
+    : 0;
 
   return (
     <div className="audit-results">
@@ -204,15 +213,31 @@ function AuditResults() {
             </section>
 
             {/* Секция: Трафик, видимость и CMS */}
-            <section className="audit-section" id="traffic">
-              <h2 className="section-title">Трафик, видимость и CMS</h2>
-              <p className="section-description">
-                В таблице собраны данные о CMS конкурентов, количестве страниц в
-                индексе, запросах в топ-5/10/50 и среднем органическом трафике в
-                день
-              </p>
-              <TrafficTable traffic={auditData?.traffic} />
-            </section>
+<section className="audit-section" id="traffic">
+  <h2 className="section-title">Трафик, видимость и CMS</h2>
+  <p className="section-description">
+    В таблице собраны данные о CMS конкурентов, количестве страниц в
+    индексе, запросах в топ-5/10/50 и среднем органическом трафике в день
+  </p>
+  {!auditData ? (
+    <div style={{ padding: 20, color: '#999' }}>Данные трафика ещё загружаются…</div>
+  ) : (
+    <>
+      <h3 className="section-subtitle">Яндекс</h3>
+      <TrafficTable
+        traffic={auditData.traffic || []}
+        footerText={`Орг. трафик/ день: ${yandexFirstTraffic}`}
+      />
+
+      <h3 className="section-subtitle" style={{ marginTop: 32 }}>Google</h3>
+      <TrafficTable
+        traffic={auditData.trafficGoogle || []}
+        footerText={`Орг. трафик/ день: ${googleFirstTraffic}`}
+      />
+    </>
+  )}
+</section>
+
 
             {/* Секция: История запросов в ТОП */}
             <section className="audit-section" id="top-requests">
@@ -305,10 +330,13 @@ function AuditResults() {
                   </div>
                 )}
               </div>
-           <RobotsChart 
-  robotsData={auditData?.robotsData}    
-  robotsTableData={auditData?.robotsTableData} 
+   <RobotsChart
+  robotsTables={auditData?.robotsTables}
+  robotsIssues={auditData?.robotsIssues}
+  sitemapTables={auditData?.sitemapTables}
 />
+
+
 
             </section>
 

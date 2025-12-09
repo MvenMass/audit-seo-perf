@@ -1,10 +1,11 @@
 import { useState } from 'react';
 
-function SemanticKeywordsTable({ keywords = { total: 0, data: [] } }) {
+function SemanticKeywordsTable({ keywords = { total: 0, data: [], totals: {} } }) {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 15;
 
   const allKeywords = keywords.data || [];
+  const totals = keywords.totals || { top1: 0, top2: 0, top3: 0 };
 
   if (!allKeywords || allKeywords.length === 0) {
     return (
@@ -36,7 +37,7 @@ function SemanticKeywordsTable({ keywords = { total: 0, data: [] } }) {
       let startPage = Math.max(2, currentPage - 1);
       let endPage = Math.min(totalPages - 1, currentPage + 1);
 
-      if (currentPage <= 3) endPage = Math.min(totalPages - 1, maxDotsPages + 1);
+      if (currentPage <= 3) endPage = Math.min(totalPages - 1, maxPagesToShow + 1);
       if (currentPage > totalPages - 3) startPage = Math.max(2, totalPages - maxDotsPages);
 
       if (startPage > 2) pages.push('...');
@@ -52,10 +53,9 @@ function SemanticKeywordsTable({ keywords = { total: 0, data: [] } }) {
   const handlePageChange = (page) => {
     if (typeof page === 'number') {
       setCurrentPage(page);
-      document.getElementById('semantic-keywords-table')?.scrollIntoView({ 
-        behavior: 'smooth', 
-        block: 'start' 
-      });
+      document
+        .getElementById('semantic-keywords-table')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   };
 
@@ -63,8 +63,12 @@ function SemanticKeywordsTable({ keywords = { total: 0, data: [] } }) {
     if (currentPage < totalPages) handlePageChange(currentPage + 1);
   };
 
+  const format = (value) =>
+    Number.isFinite(value) ? Math.round(value).toLocaleString('ru-RU') : '0';
+
   return (
     <div className="traffic-table-container">
+      {/* Основная таблица по запросам */}
       <table
         className="traffic-table semantic-keywords-table"
         id="semantic-keywords-table"
@@ -72,38 +76,24 @@ function SemanticKeywordsTable({ keywords = { total: 0, data: [] } }) {
         <thead>
           <tr>
             <th>Ключевое слово/фраза</th>
-            <th>Тип</th>
-            <th>Общая частотность</th>
-            <th>Пик за месяц</th>
+            <th>Топ‑1</th>
+            <th>Топ‑2</th>
+            <th>Топ‑3</th>
           </tr>
         </thead>
         <tbody>
           {currentData.map((row) => (
             <tr key={row.id}>
               <td>{row.keyword}</td>
-              <td>
-                <span style={{
-                  padding: '4px 8px',
-                  borderRadius: '4px',
-                  fontSize: '12px',
-                  fontWeight: '500',
-                  backgroundColor: row.type === 'Коммерческий' 
-                    ? 'rgba(139, 92, 246, 0.1)' 
-                    : 'rgba(251, 146, 60, 0.1)',
-                  color: row.type === 'Коммерческий' 
-                    ? 'rgb(139, 92, 246)' 
-                    : 'rgb(251, 146, 60)'
-                }}>
-                  {row.type}
-                </span>
-              </td>
-              <td>{row.frequency.toLocaleString('ru-RU')}</td>
-              <td>{row.maxMonth.toLocaleString('ru-RU')}</td>
+              <td>{format(row.top1)}</td>
+              <td>{format(row.top2)}</td>
+              <td>{format(row.top3)}</td>
             </tr>
           ))}
         </tbody>
       </table>
 
+      {/* Пагинация */}
       {totalPages > 1 && (
         <div className="pagination">
           <div className="pagination-buttons">
@@ -132,10 +122,30 @@ function SemanticKeywordsTable({ keywords = { total: 0, data: [] } }) {
           </div>
         </div>
       )}
+
+      {/* Итоговая таблица по всем запросам */}
+      <div style={{ marginTop: '24px' }}>
+        <table className="traffic-table semantic-keywords-summary">
+          <thead>
+            <tr>
+              <th>Итого запросов</th>
+              <th>Топ‑1</th>
+              <th>Топ‑2</th>
+              <th>Топ‑3</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>{keywords.total}</td>
+              <td>{format(totals.top1)}</td>
+              <td>{format(totals.top2)}</td>
+              <td>{format(totals.top3)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
-
-
 
 export default SemanticKeywordsTable;

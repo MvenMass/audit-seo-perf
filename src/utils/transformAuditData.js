@@ -44,19 +44,38 @@ export const transformAuditData = (serverData, formData) => {
     info: domain === mainSite ? "Основной домен" : "Конкурент"
   }));
 
-  // 3. Трафик
-  const traffic = domains.map(domain => {
-    const data = serverData.domainsDashboards[domain];
-    return {
-      site: domain.replace('https://', '').replace('http://', '').replace(/\/$/, ''),
-      cms: data?.cms || "Unknown",
-      pages: data?.pagesInIndex || 0,
-      top5: data?.top5 || 0,
-      top10: data?.top10 || 0,
-      top50: data?.top50 || 0,
-      traffic: data?.visits || 0
-    };
-  });
+// 3. Трафик
+const traffic = domains.map(domain => {
+  const data = serverData.domainsDashboards[domain] || {};
+  return {
+    site: domain.replace('https://', '').replace('http://', '').replace(/\/$/, ''),
+    cms: data.cms || 'Unknown',
+    pages: data.pagesInIndex || 0,
+    top5: data.top5 || 0,
+    top10: data.top10 || 0,
+    top50: data.top50 || 0,
+    traffic: data.visits || 0,
+  };
+});
+
+// отдельный трафик по Google
+const trafficGoogle = domains.map(domain => {
+  const data = serverData.domainsDashboards[domain] || {};
+  const google = data.google || {};
+  return {
+    site: domain.replace('https://', '').replace('http://', '').replace(/\/$/, ''),
+    cms: google.cms || data.cms || 'Unknown',
+    pages: google.pagesInIndex || 0,
+    top5: google.top5 || 0,
+    top10: google.top10 || 0,
+    top50: google.top50 || 0,
+    traffic: google.visits || 0,
+  };
+});
+
+console.log('📊 TRANSFORMED traffic (общий):', traffic);
+console.log('📊 TRANSFORMED trafficGoogle:', trafficGoogle);
+console.log('📊 TRANSFORMED traffic (общий):', traffic);
 
   // 4. График истории запросов
   const topDomainsChart = {
@@ -191,18 +210,56 @@ console.log('🔥 Seasonality результат (первые 5):', {
     method: icon.method
   })) || [];
 
-  // 8. PageSpeed
-  const mobileScore = serverData.checkPageSpeedMobile?.mobile?.lighthouseResult?.categories?.performance?.score || 0;
-  const desktopScore = serverData.checkPageSpeedMobile?.desktop?.lighthouseResult?.categories?.performance?.score || 0;
-  
-  const pageSpeed = [
-    {
-      metric: "Скорость загрузки",
-      mobile: `${Math.round(mobileScore * 100)}/100`,
-      desktop: `${Math.round(desktopScore * 100)}/100`
-    }
-    // TODO: добавить остальные метрики из lighthouseResult.audits
-  ];
+// 8. PageSpeed
+const lighthouseMobile = serverData.checkPageSpeedMobile?.mobile?.lighthouseResult;
+const lighthouseDesktop = serverData.checkPageSpeedMobile?.desktop?.lighthouseResult;
+
+const mobilePerfScore =
+  lighthouseMobile?.categories?.performance?.score || 0;
+const desktopPerfScore =
+  lighthouseDesktop?.categories?.performance?.score || 0;
+
+const getAuditValue = (lh, id) =>
+  lh?.audits?.[id]?.displayValue || '—';
+
+const pageSpeed = [
+  {
+    metric: 'Итоговый балл (Performance)',
+    mobile: `${Math.round(mobilePerfScore * 100)}/100`,
+    desktop: `${Math.round(desktopPerfScore * 100)}/100`,
+  },
+  {
+    metric: 'First Contentful Paint (FCP)',
+    mobile: getAuditValue(lighthouseMobile, 'first-contentful-paint'),
+    desktop: getAuditValue(lighthouseDesktop, 'first-contentful-paint'),
+  },
+  {
+    metric: 'Largest Contentful Paint (LCP)',
+    mobile: getAuditValue(lighthouseMobile, 'largest-contentful-paint'),
+    desktop: getAuditValue(lighthouseDesktop, 'largest-contentful-paint'),
+  },
+  {
+    metric: 'Speed Index',
+    mobile: getAuditValue(lighthouseMobile, 'speed-index'),
+    desktop: getAuditValue(lighthouseDesktop, 'speed-index'),
+  },
+  {
+    metric: 'Time to Interactive (TTI)',
+    mobile: getAuditValue(lighthouseMobile, 'interactive'),
+    desktop: getAuditValue(lighthouseDesktop, 'interactive'),
+  },
+  {
+    metric: 'Total Blocking Time (TBT)',
+    mobile: getAuditValue(lighthouseMobile, 'total-blocking-time'),
+    desktop: getAuditValue(lighthouseDesktop, 'total-blocking-time'),
+  },
+  {
+    metric: 'Cumulative Layout Shift (CLS)',
+    mobile: getAuditValue(lighthouseMobile, 'cumulative-layout-shift'),
+    desktop: getAuditValue(lighthouseDesktop, 'cumulative-layout-shift'),
+  },
+];
+
 
   // 9. SSL
   const ssl = {
@@ -216,25 +273,20 @@ console.log('🔥 Seasonality результат (первые 5):', {
   };
 
 // 10. Robots и Sitemap
-console.log('🤖 RAW robotsReport:', serverData.robotsReport);
-console.log('🤖 RAW sitemapReport:', serverData.sitemapReport);
-
 const robotsReport = serverData.robotsReport || {};
 const sitemapReport = serverData.sitemapReport || {};
 
 const robots = {
   httpStatus: robotsReport.statusCode || 0,
   found: robotsReport.exists || false,
-  errors: robotsReport.isValid === false,
+  isValid: robotsReport.isValid !== false, // ← поправка: использовать isValid
   errorsList: robotsReport.errors || [],
   warningsList: robotsReport.warnings || [],
   suggestionsList: robotsReport.suggestions || [],
   content: robotsReport.content || '',
   stats: robotsReport.stats || {},
   seo: robotsReport.seo || {},
-  
-  // Sitemap данные
-  sitemapUrl: robotsReport.directives?.sitemaps?.[0] || "N/A",
+  sitemapUrl: robotsReport.directives?.sitemaps?.[0] || 'N/A',
   sitemapExists: sitemapReport.totalUrls > 0,
   sitemapStatus: sitemapReport.totalUrls > 0 ? 200 : 404,
   totalSitemaps: sitemapReport.totalSitemaps || 0,
@@ -243,117 +295,156 @@ const robots = {
   successfulUrls: sitemapReport.successfulUrls || 0,
   duplicates: sitemapReport.duplicateUrls || 0,
   inaccessible: sitemapReport.failedUrls || 0,
-  blocked: sitemapReport.blockedUrls || 0
+  blocked: sitemapReport.blockedUrls || 0,
 };
 
-console.log('🤖 Трансформированный robots:', robots);
-
-// ✅ Данные для графика robots
-const robotsData = {
-  top1: {
-    title: 'Статистика robots.txt',
-    labels: ['Всего строк', 'User-Agents', 'Disallow правил', 'Allow правил'],
-    data: [
-      robots.stats.totalLines || 0,
-      robots.stats.userAgents || 0,
-      robots.stats.disallowRules || 0,
-      robots.stats.allowRules || 0
-    ]
+// Таблицы для robots.txt
+const robotsTables = {
+  general: {
+    title: 'Данные robots.txt',
+    columns: ['Показатель', 'Значение'],
+    rows: [
+      { label: 'Найден', value: robots.found ? 'Да' : 'Нет' },
+      { label: 'HTTP статус', value: `${robots.httpStatus} (OK)` },
+      { label: 'Валидность файла', value: robots.isValid ? 'Валидный' : 'НЕВАЛИДНЫЙ' }, // ← исправлено
+      { label: 'Всего строк', value: robots.stats.totalLines || 0 },
+      { label: 'User-Agents', value: robots.stats.userAgents || 0 },
+      { label: 'Disallow правил', value: robots.stats.disallowRules || 0 },
+      { label: 'Allow правил', value: robots.stats.allowRules || 0 },
+    ],
   },
-  top3: {
-    title: 'Проверка URL в sitemap',
-    labels: ['Всего URL', 'Успешных', 'Недоступных', 'Дубликатов'],
-    data: [
-      robots.sitemapUrls,
-      robots.successfulUrls,
-      robots.inaccessible,
-      robots.duplicates
-    ]
+  status: {
+    title: 'Статус проверки',
+    columns: ['Категория', 'Количество', 'Статус'],
+    rows: [
+      {
+        label: 'Критические ошибки',
+        value: (robots.errorsList || []).length,
+        status: (robots.errorsList || []).length > 0 ? 'ОШИБКИ' : 'Нет',
+      },
+      {
+        label: 'Предупреждения',
+        value: (robots.warningsList || []).length,
+        status: (robots.warningsList || []).length > 0 ? 'ЕСТЬ' : 'Нет',
+      },
+      {
+        label: 'Рекомендации',
+        value: (robots.suggestionsList || []).length,
+        status: (robots.suggestionsList || []).length > 0 ? 'ЕСТЬ' : 'Нет',
+      },
+    ],
   },
-  top5: {
-    title: 'Статус файлов',
-    labels: ['robots.txt найден', 'sitemap найдена', 'Ошибки robots', 'Предупреждения'],
-    data: [
-      robots.found ? 1 : 0,
-      robots.sitemapExists ? 1 : 0,
-      robots.errorsList.length,
-      robots.warningsList.length
-    ]
+  seo: {
+    title: 'SEO-анализ',
+    columns: ['Проверяемый параметр', 'Результат', 'Статус'],
+    rows: [
+      {
+        label: 'Блокировка CSS/JS файлов',
+        value: robots.seo?.blocksCssJs ? '❌ Заблокированы' : '✅ Не блокируются',
+        status: robots.seo?.blocksCssJs ? '❌' : '✅',
+      },
+      {
+        label: 'Блокировка изображений',
+        value: robots.seo?.blocksImages ? '❌ Заблокированы' : '✅ Не блокируются',
+        status: robots.seo?.blocksImages ? '❌' : '✅',
+      },
+      {
+        label: 'Доступность карты сайта',
+        value: robots.seo?.sitemapAccessible ? '✅ Доступна' : '❌ Недоступна',
+        status: robots.seo?.sitemapAccessible ? '✅' : '❌',
+      },
+      {
+        label: 'Специальные правила для Googlebot',
+        value: robots.seo?.googlebotSpecificRules ? '✅ Есть' : '❌ Отсутствуют', // ← исправлено имя поля
+        status: robots.seo?.googlebotSpecificRules ? '✅' : '⚠️',
+      },
+      {
+        label: 'ВАЖНО: Сайт закрыт для индексации',
+        value: robots.seo?.blocksCssJs && robots.seo?.blocksImages ? '❌ Disallow: /' : '✅ Открыт', // временно, для демо
+        status: robots.seo?.blocksCssJs && robots.seo?.blocksImages ? '❌' : '✅',
+      },
+    ],
   },
-  percentage: {
-    title: 'Процент проблем в sitemap',
-    labels: ['Дубликаты %', 'Недоступные %', 'Успешные %'],
-    data: [
-      robots.checkedUrls > 0 ? Number(((robots.duplicates / robots.checkedUrls) * 100).toFixed(1)) : 0,
-      robots.checkedUrls > 0 ? Number(((robots.inaccessible / robots.checkedUrls) * 100).toFixed(1)) : 0,
-      robots.checkedUrls > 0 ? Number(((robots.successfulUrls / robots.checkedUrls) * 100).toFixed(1)) : 0
-    ]
-  },
-  pages: {
-    title: 'Карты сайта',
-    labels: ['Всего sitemaps', 'Всего URL', 'Проверено URL'],
-    data: [
-      robots.totalSitemaps,
-      robots.sitemapUrls,
-      robots.checkedUrls
-    ]
-  },
-  traffic: {
-    title: 'HTTP статусы',
-    labels: ['robots.txt', 'sitemap.xml'],
-    data: [
-      robots.httpStatus,
-      robots.sitemapStatus
-    ]
-  }
 };
 
-// ✅ Данные для таблицы robots - показываем ошибки и предупреждения
-const robotsTableData = [];
+// Отдельные списки ошибок/предупреждений robots.txt
+const robotsIssues = {
+  critical: robots.errorsList.map((error, index) => ({
+    id: index + 1,
+    type: 'Критическая ошибка',
+    title: `Ошибка ${index + 1}`,
+    description: error,
+  })),
+  warnings: robots.warningsList.map((warning, index) => ({
+    id: index + 1,
+    type: 'Предупреждение',
+    title: `Предупреждение ${index + 1}`,
+    description: warning,
+  })),
+  recommendations: robots.suggestionsList.map((s, index) => ({
+    id: index + 1,
+    type: 'Рекомендация',
+    title: `Рекомендация ${index + 1}`,
+    description: s,
+  })),
+};
 
-// Добавляем ошибки
-robots.errorsList.forEach((error, index) => {
-  robotsTableData.push({
-    id: robotsTableData.length + 1,
-    status: '❌ Ошибка',
-    query: `Критическая проблема ${index + 1}`,
-    info: error
-  });
-});
-
-// Добавляем предупреждения
-robots.warningsList.forEach((warning, index) => {
-  robotsTableData.push({
-    id: robotsTableData.length + 1,
-    status: '⚠️ Предупреждение',
-    query: `Внимание ${index + 1}`,
-    info: warning
-  });
-});
-
-// Добавляем рекомендации
-robots.suggestionsList.forEach((suggestion, index) => {
-  robotsTableData.push({
-    id: robotsTableData.length + 1,
-    status: '💡 Рекомендация',
-    query: `Совет ${index + 1}`,
-    info: suggestion
-  });
-});
-
-// Если нет данных - показываем заглушку
-if (robotsTableData.length === 0) {
-  robotsTableData.push({
-    id: 1,
-    status: '✅ OK',
-    query: 'Проблем не обнаружено',
-    info: 'robots.txt и sitemap.xml настроены корректно'
-  });
-}
-
-console.log('🤖 robotsData:', robotsData);
-console.log('🤖 robotsTableData:', robotsTableData);
-
+// Таблицы для sitemap.xml
+const sitemapTables = {
+  main: {
+    title: 'Основная статистика sitemap',
+    columns: ['Показатель', 'Значение'],
+    rows: [
+      { label: 'Общее количество карт сайта', value: robots.totalSitemaps },
+      { label: 'Общее количество URL', value: robots.sitemapUrls },
+      { label: 'Проверено URL', value: robots.checkedUrls },
+      {
+        label: 'Успешные запросы',
+        value:
+          robots.checkedUrls > 0
+            ? `${robots.successfulUrls} (${((robots.successfulUrls / robots.checkedUrls) * 100).toFixed(1)}%) ✅`
+            : `${robots.successfulUrls}`,
+      },
+      {
+        label: 'Неработающие ссылки',
+        value:
+          robots.checkedUrls > 0
+            ? `${robots.inaccessible} (${((robots.inaccessible / robots.checkedUrls) * 100).toFixed(1)}%) ❌`
+            : `${robots.inaccessible}`,
+      },
+      { label: 'Внешние ссылки', value: sitemapReport.externalUrls || 0 },
+      { label: 'Редиректы', value: sitemapReport.redirectUrls || 0 },
+    ],
+  },
+  statusCodes: {
+    title: 'Статистика по кодам ответа',
+    columns: ['HTTP код', 'Количество', 'Процент', 'Статус'],
+    rows: Object.entries(sitemapReport.statusCodes || {}).map(([code, count]) => {
+      const percent =
+        robots.sitemapUrls > 0
+          ? ((count / robots.sitemapUrls) * 100).toFixed(1)
+          : '0.0';
+      const ok = code === '200';
+      return {
+        http: `${code} (${code === '200' ? 'OK' : 'Not Found'})`,
+        count,
+        percent,
+        status: ok ? '✅ Успешно' : '❌ Ошибка',
+      };
+    }),
+  },
+  recommendations: {
+    title: 'Рекомендации',
+    columns: ['Тип', 'Название', 'Описание', 'Рекомендация'],
+    rows: (sitemapReport.recommendations || []).map((rec, index) => ({
+      id: index + 1,
+      type: rec.type === 'critical' ? '⚠️ Критическая' : 'Рекомендация',
+      title: rec.title || rec.name || 'Проблема sitemap',
+      description: rec.description || '',
+      suggestion: rec.action || rec.suggestion || rec.recommendation || '', // ← исправлено: action вместо suggestion
+    })),
+  },
+};
 
   // 11. Видимость
   const visibility = {
@@ -401,61 +492,64 @@ console.log('🤖 robotsTableData:', robotsTableData);
     }
   };
 
-// 13. Семантические ключевые слова (из forSeasonChart)
-console.log('🔑 Формируем ключевые слова из forSeasonChart');
+// 13. Семантические ключевые слова (только из CommerceForecast)
+console.log('🔑 Формируем ключевые слова из CommerceForecast');
 
-const commerceKeywords = serverData.forSeasonChart?.commerce || [];
-const nonCommerceKeywords = serverData.forSeasonChart?.nonCommerce || [];
+const commerceForecastObj = serverData.CommerceForecast || {};
 
-const allKeywords = [
-  ...commerceKeywords.map(item => ({ ...item, type: 'Коммерческий' })),
-  ...nonCommerceKeywords.map(item => ({ ...item, type: 'Некоммерческий' }))
-];
+const semanticKeywordsData = Object.entries(commerceForecastObj)
+  .map(([keyword, regionData], index) => {
+    let base = 0;
 
-const semanticKeywords = {
-  total: allKeywords.length,
-  data: allKeywords.map((item, index) => {
-    // Подсчитываем общую частотность из всех месяцев
-    let totalFrequency = 0;
-    let maxMonthValue = 0;
-    
-    if (item.data && typeof item.data === 'object') {
-      Object.values(item.data).forEach(value => {
-        let freq = 0;
-        if (typeof value === 'number') {
-          freq = value;
-        } else if (typeof value === 'object' && value !== null) {
-          freq = value.frequency || value.count || value.value || 0;
+    if (regionData && typeof regionData === 'object') {
+      Object.values(regionData).forEach((value) => {
+        if (value && typeof value === 'object') {
+          const v = Number(value.base) || 0;
+          base += v;
         }
-        totalFrequency += freq;
-        maxMonthValue = Math.max(maxMonthValue, freq);
       });
     }
 
+    const top1 = base * 0.3;
+    const top2 = base * 0.15;
+    const top3 = base * 0.1;
+    const totalScore = top1 + top2 + top3;
+
     return {
       id: index + 1,
-      keyword: item.keyword || item.query || 'N/A',
-      frequency: totalFrequency, // Общая частотность за все месяцы
-      type: item.type,
-      maxMonth: maxMonthValue, // Пиковое значение
-      top1: '-',  // Нет данных с бэкенда
-      top5: '-',  // Нет данных с бэкенда
-      top10: '-'  // Нет данных с бэкенда
+      keyword: keyword || 'N/A',
+      top1,
+      top2,
+      top3,
+      total: totalScore,
     };
-  }).sort((a, b) => b.frequency - a.frequency) // Сортировка по убыванию частотности
+  })
+  .sort((a, b) => b.total - a.total);
+
+const semanticTotals = semanticKeywordsData.reduce(
+  (acc, row) => {
+    acc.top1 += row.top1 || 0;
+    acc.top2 += row.top2 || 0;
+    acc.top3 += row.top3 || 0;
+    acc.total += row.total || 0;
+    return acc;
+  },
+  { top1: 0, top2: 0, top3: 0, total: 0 }
+);
+
+const semanticKeywords = {
+  total: semanticKeywordsData.length,
+  data: semanticKeywordsData,
+  totals: semanticTotals, // ← общие суммы по всем запросам
 };
 
-console.log('🔑 Трансформированный semanticKeywords:', {
+console.log('🔑 TRANSFORMED semanticKeywords:', {
   total: semanticKeywords.total,
   firstItem: semanticKeywords.data[0],
-  sample: semanticKeywords.data.slice(0, 3)
+  sample: semanticKeywords.data.slice(0, 5),
+  totals: semanticKeywords.totals,
 });
 
-console.log('🔑 Трансформированный semanticKeywords:', {
-  total: semanticKeywords.total,
-  firstItem: semanticKeywords.data[0],
-  lastItem: semanticKeywords.data[semanticKeywords.data.length - 1]
-});
 
   return {
     domainInfo: {
@@ -466,7 +560,8 @@ console.log('🔑 Трансформированный semanticKeywords:', {
     },
     metrics,
     competitors,
-    traffic,
+  traffic,         
+  trafficGoogle,
     topDomainsChart,
     seasonality,
     semanticCore,
@@ -476,8 +571,9 @@ console.log('🔑 Трансформированный semanticKeywords:', {
     robots,
     visibility,
     positionStats,
-    robotsData,     
-    robotsTableData,  
+     robotsTables,       
+  robotsIssues,         
+  sitemapTables,   
      semanticKeywords
   };
 };

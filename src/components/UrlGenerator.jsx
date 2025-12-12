@@ -31,7 +31,6 @@ const UrlGenerator = () => {
     "https://cinar.ru/",
     "https://stk-promo.com/",
     "https://www.gemius.ru/",
-    "https://www.advertpro.ru/"
   ]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -105,7 +104,6 @@ const UrlGenerator = () => {
       "https://cinar.ru/",
       "https://stk-promo.com/",
       "https://www.gemius.ru/",
-      "https://www.advertpro.ru/"
     ]);
     setError(null);
   };

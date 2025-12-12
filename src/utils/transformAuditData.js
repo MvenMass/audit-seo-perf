@@ -37,12 +37,24 @@ export const transformAuditData = (serverData, formData) => {
   ];
 
   // 2. Конкуренты
-  const competitors = domains.map(domain => ({
-    domain: domain.replace('https://', '').replace('http://', '').replace(/\/$/, ''),
-    age: serverData.domainsDashboards[domain]?.domainAge || "Не определен",
-    source: "API",
-    info: domain === mainSite ? "Основной домен" : "Конкурент"
-  }));
+ // 2. Конкуренты
+const competitors = domains.map(domain => {
+  const dash = serverData.domainsDashboards[domain] || {};
+  const ageObj = dash.domainAge;
+
+  return {
+    domain: domain
+      .replace('https://', '')
+      .replace('http://', '')
+      .replace(/\/$/, ''),
+    age: ageObj?.formattedAge || 'Не определен', // ✅ только строка
+    // если нужно где‑то отдельно использовать структуру age:
+    ageRaw: ageObj || null,
+    source: 'API',
+    info: domain === mainSite ? 'Основной домен' : 'Конкурент',
+  };
+});
+
 
 // 3. Трафик
 const traffic = domains.map(domain => {
